@@ -85,6 +85,87 @@ function urlAlreadyInList(url) {
   return currentProducts.some((p) => normalizeUrlKey(p.url) === key);
 }
 
+/** Short display mask: www.store.com/<id> (full URL stays in href). */
+function maskProductUrl(url, retailer) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  let host = "";
+  let path = "";
+  let search = "";
+  try {
+    const u = new URL(raw);
+    host = (u.hostname || "").toLowerCase();
+    path = u.pathname || "";
+    search = u.search || "";
+  } catch {
+    return raw.length > 36 ? `${raw.slice(0, 33)}…` : raw;
+  }
+  if (host.startsWith("www.")) host = host.slice(4);
+
+  const store =
+    String(retailer || "").toLowerCase() ||
+    (host.includes("amazon.")
+      ? "amazon"
+      : host.includes("walmart.")
+        ? "walmart"
+        : host.includes("safeway.")
+          ? "safeway"
+          : host.includes("instacart.")
+            ? "instacart"
+            : host.includes("target.")
+              ? "target"
+              : "");
+
+  let id = "";
+  if (store === "amazon") {
+    const m =
+      path.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})(?:\/|$)/i) ||
+      search.match(/[?&]asin=([A-Z0-9]{10})(?:&|$)/i);
+    id = m ? m[1].toUpperCase() : "";
+    host = "amazon.com";
+  } else if (store === "walmart") {
+    const m =
+      path.match(/\/ip\/(?:[^/]+\/)?(\d{6,})(?:\/|$)/i) ||
+      search.match(/[?&](?:itemId|item_id)=(\d{6,})/i);
+    id = m ? m[1] : "";
+    host = "walmart.com";
+  } else if (store === "safeway") {
+    const m =
+      path.match(/product-details\.(\d+)/i) ||
+      path.match(/\/product\/[^/]+\/(\d+)/i);
+    id = m ? m[1] : "";
+    host = "safeway.com";
+  } else if (store === "instacart") {
+    const m = path.match(/\/products\/(\d+)/i);
+    id = m ? m[1] : "";
+    host = "instacart.com";
+  } else if (store === "target") {
+    const m =
+      path.match(/\/A-(\d{6,})/i) || search.match(/[?&]tcin=(\d{6,})/i);
+    id = m ? `A-${m[1]}` : "";
+    host = "target.com";
+  } else {
+    host = host || "link";
+    const parts = path.split("/").filter(Boolean);
+    id = parts[parts.length - 1] || "";
+    id = id.replace(/\.(html?|php)$/i, "");
+  }
+
+  id = String(id || "")
+    .replace(/[?#].*$/, "")
+    .trim();
+  if (!id) {
+    const parts = path.split("/").filter(Boolean);
+    id = parts[parts.length - 1] || "item";
+    id = id.replace(/\.(html?|php)$/i, "");
+  }
+  // Keep a consistent visual length across stores.
+  const MAX_ID = 20;
+  if (id.length > MAX_ID) id = `${id.slice(0, MAX_ID - 1)}…`;
+
+  return `www.${host}/${id}`;
+}
+
 function formatRemaining(seconds) {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
   const hours = Math.floor(total / 3600);
@@ -563,7 +644,7 @@ function renderProducts(products) {
       <div>
         <span class="store">${escapeHtml(p.brand || p.retailer)}</span>
         <h3 class="name">${escapeHtml(p.name || "Unnamed")}</h3>
-        <p class="product-url"><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.url)}</a></p>
+        <p class="product-url"><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener" title="${escapeHtml(p.url)}">${escapeHtml(maskProductUrl(p.url, p.retailer))}</a></p>
         <p class="meta">${
           p.pending
             ? "New store — available in 24 hours."

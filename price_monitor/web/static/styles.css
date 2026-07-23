@@ -318,8 +318,10 @@ main {
 
 .product-url {
   margin: 0.3rem 0 0;
-  font-size: 0.82rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8rem;
   line-height: 1.35;
+  letter-spacing: -0.01em;
   word-break: break-all;
 }
 

@@ -59,7 +59,7 @@ class WalmartAdapter:
             product_id = walmart_product_id_from_url(raw_url)
         if not product_id:
             raise ValueError(
-                f"Não foi possível extrair o product_id da URL Walmart: {raw_url}"
+                f"Could not extract product_id from Walmart URL: {raw_url}"
             )
 
         fields["url"] = walmart_canonical_url(product_id, raw_url)
@@ -80,7 +80,7 @@ class WalmartAdapter:
             page.goto(WARM_URL, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
             page.wait_for_timeout(PAGE_SETTLE_MS)
             if self._looks_like_challenge(page):
-                print("  Challenge na home Walmart — aguardando...")
+                print("  Challenge on Walmart home — waiting...")
                 if not self._wait_challenge_auto(page, timeout_ms=CHALLENGE_WAIT_MS):
                     if not headless:
                         self._wait_challenge(page, headless=False)
@@ -91,19 +91,19 @@ class WalmartAdapter:
         self, product: Product, settings: dict[str, Any]
     ) -> ScrapedProduct:
         if not product.product_id:
-            raise WalmartApiError("Produto Walmart sem product_id.")
-        print("  Fonte: SerpApi (walmart_product)")
+            raise WalmartApiError("Walmart product missing product_id.")
+        print("  Source: SerpApi (walmart_product)")
         item = fetch_item(product.product_id, settings)
         ctx = describe_offer_context(item)
         if ctx:
-            print(f"  Contexto: {ctx}")
+            print(f"  Context: {ctx}")
         title, current, list_price = parse_item_price(item)
         if not title:
             title = product.name
         if item.get("in_stock") is False:
             print(
-                "  Aviso: SerpApi marca sem estoque nesta loja — "
-                "preço pode ser de marketplace. Ajuste store_id/zip."
+                "  Warning: SerpApi marks out of stock at this store — "
+                "price may be from marketplace. Adjust store_id/zip."
             )
         return ScrapedProduct(title, current, list_price, None)
 
@@ -125,11 +125,11 @@ class WalmartAdapter:
                 if not allow_browser:
                     raise ChallengeRequiredError(
                         f"{exc}\n"
-                        "Configure SERPAPI_API_KEY ou ative "
+                        "Set SERPAPI_API_KEY or enable "
                         "retailers.walmart.browser_fallback=true "
-                        "(PerimeterX costuma bloquear)."
+                        "(PerimeterX usually blocks)."
                     ) from exc
-                print(f"  SerpApi falhou ({exc}); tentando browser...")
+                print(f"  SerpApi failed ({exc}); trying browser...")
 
         self._open_product(page, product.url, headless=headless)
         title_ld, price_ld, list_ld = self._from_json_ld(page)
@@ -146,9 +146,9 @@ class WalmartAdapter:
         page.wait_for_timeout(PAGE_SETTLE_MS)
 
         if self._looks_like_challenge(page):
-            print("  Verificação Walmart (PerimeterX) detectada...")
+            print("  Walmart verification (PerimeterX) detected...")
             if self._wait_challenge_auto(page, timeout_ms=CHALLENGE_WAIT_MS):
-                print("  Verificação liberou automaticamente.")
+                print("  Verification cleared automatically.")
             else:
                 self._wait_challenge(page, headless=headless)
                 if self._looks_like_challenge(page):
@@ -200,7 +200,7 @@ class WalmartAdapter:
         product_url: str | None = None,
     ) -> bool:
         if self.can_use_api(settings):
-            print("  Walmart está em modo SerpApi — warm de browser não é necessário.")
+            print("  Walmart is in SerpApi mode — browser warm is not needed.")
             try:
                 # Smoke test da API com o product_id da URL se possível
                 from price_monitor.urls import walmart_product_id_from_url
@@ -211,40 +211,40 @@ class WalmartAdapter:
                     title, price, _ = parse_item_price(item)
                     print(f"  SerpApi OK: {title or pid} | ${price}")
                 else:
-                    print("  SERPAPI_API_KEY presente (sem product_id para testar).")
+                    print("  SERPAPI_API_KEY present (no product_id to test).")
                 return True
             except WalmartApiError as exc:
-                print(f"  SerpApi falhou: {exc}")
+                print(f"  SerpApi failed: {exc}")
                 return False
 
         url = (product_url or "").strip() or WARM_URL
         print(f"  Warm Walmart (browser): {url}")
         print("=" * 60)
-        print("  Preferível: configure SERPAPI_API_KEY (sem Press & Hold).")
-        print("  Enquanto isso: se aparecer Press & Hold, SEGURE na janela.")
+        print("  Preferred: set SERPAPI_API_KEY (no Press & Hold).")
+        print("  Meanwhile: if Press & Hold appears, HOLD it in the window.")
         print("=" * 60)
         page.goto(WARM_URL, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         page.wait_for_timeout(PAGE_SETTLE_MS)
         if self._looks_like_challenge(page):
-            print("  Challenge na home — faça Press & Hold agora...")
+            print("  Challenge on home — do Press & Hold now...")
             if not self._wait_until_clear(page, timeout_ms=HEADED_CHALLENGE_WAIT_MS):
-                print("  Warm falhou na home.")
+                print("  Warm failed on home.")
                 return False
-            print("  Home liberada.")
+            print("  Home cleared.")
 
         if url.rstrip("/") != WARM_URL.rstrip("/"):
             page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
             page.wait_for_timeout(PAGE_SETTLE_MS)
             if self._looks_like_challenge(page) or not self._has_product_payload(page):
-                print("  Challenge/produto — faça Press & Hold se aparecer...")
+                print("  Challenge/product — do Press & Hold if it appears...")
                 if not self._wait_until_clear(page, timeout_ms=HEADED_CHALLENGE_WAIT_MS):
-                    print("  Warm falhou no produto.")
+                    print("  Warm failed on product.")
                     return False
             if not self._has_product_payload(page):
-                print("  Warm parcial — home OK.")
+                print("  Partial warm — home OK.")
                 return True
 
-        print("  Warm OK — sessão Walmart gravada.")
+        print("  Warm OK — Walmart session saved.")
         return True
 
     def _wait_until_clear(self, page: Page, *, timeout_ms: int) -> bool:
@@ -272,16 +272,16 @@ class WalmartAdapter:
     def _wait_challenge(self, page: Page, *, headless: bool) -> None:
         if headless:
             raise ChallengeRequiredError(
-                "Walmart bloqueou no browser.\n"
-                "Use SerpApi (recomendado):\n"
+                "Walmart blocked in the browser.\n"
+                "Use SerpApi (recommended):\n"
                 "  SERPAPI_API_KEY\n"
-                "Ou: python -m price_monitor warm --retailer walmart --reset-profile"
+                "Or: python -m price_monitor warm --retailer walmart --reset-profile"
             )
-        print("  Press & Hold na janela — aguardando (sem Enter)...")
+        print("  Press & Hold in the window — waiting (no Enter)...")
         if self._wait_until_clear(page, timeout_ms=HEADED_CHALLENGE_WAIT_MS):
-            print("  Página liberada.")
+            print("  Page cleared.")
             return
-        raise ChallengeRequiredError("Walmart não liberou a tempo.")
+        raise ChallengeRequiredError("Walmart did not clear in time.")
 
     def _looks_like_challenge(self, page: Page) -> bool:
         url = (page.url or "").lower()

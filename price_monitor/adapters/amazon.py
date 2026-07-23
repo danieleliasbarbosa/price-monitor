@@ -44,7 +44,7 @@ class AmazonAdapter:
             asin = amazon_asin_from_url(raw_url)
         if not asin:
             raise ValueError(
-                f"Não foi possível extrair o ASIN da URL Amazon: {raw_url}"
+                f"Could not extract ASIN from Amazon URL: {raw_url}"
             )
 
         fields["url"] = amazon_canonical_url(asin, raw_url)
@@ -84,7 +84,7 @@ class AmazonAdapter:
 
         title = self._extract_title(page)
         if self._is_unavailable(page):
-            print("  Disponibilidade: indisponível / out of stock")
+            print("  Availability: unavailable / out of stock")
             return ScrapedProduct(title, None, None, None)
 
         current = self._extract_current_price(page)
@@ -122,21 +122,21 @@ class AmazonAdapter:
         return "currently unavailable" in body
 
     def run_auth(self, page: Page) -> int:
-        print("Amazon não usa subcomando auth. Rode check com --no-headless se houver captcha.")
+        print("Amazon does not use the auth command. Run check with --no-headless if there is a captcha.")
         return 1
 
     def _wait_challenge(self, page: Page, *, headless: bool) -> None:
         if headless:
             raise ChallengeRequiredError(
-                "Amazon pediu captcha em headless. Rode:\n"
+                "Amazon asked for a captcha in headless mode. Run:\n"
                 "  python -m price_monitor check --retailer amazon --no-headless"
             )
         print("\n" + "=" * 60)
-        print("AVISO: Amazon pediu captcha / verificação.")
-        print("Resolva no navegador e pressione Enter.")
+        print("WARNING: Amazon asked for a captcha / verification.")
+        print("Solve it in the browser, then press Enter.")
         print("=" * 60 + "\n")
         try:
-            input("Pressione Enter após resolver... ")
+            input("Press Enter after solving... ")
         except EOFError:
             time.sleep(60)
         try:

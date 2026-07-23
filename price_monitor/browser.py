@@ -80,7 +80,7 @@ def create_context(
             context = None
 
     if context is None:
-        raise RuntimeError(f"Não foi possível abrir o navegador ({last_error})")
+        raise RuntimeError(f"Could not open the browser ({last_error})")
 
     try:
         context.add_init_script(_STEALTH_INIT)
@@ -132,7 +132,7 @@ def create_cdp_chrome_session(
     chrome = find_chrome_executable()
     if chrome is None:
         raise RuntimeError(
-            "Google Chrome não encontrado. Instale o Chrome ou defina CHROME_PATH."
+            "Google Chrome not found. Install Chrome or set CHROME_PATH."
         )
 
     profile_dir = profile_dir.resolve()
@@ -165,11 +165,11 @@ def create_cdp_chrome_session(
         if _port_open("127.0.0.1", use_port):
             break
         if proc.poll() is not None:
-            raise RuntimeError("Chrome CDP encerrou ao iniciar.")
+            raise RuntimeError("Chrome CDP exited while starting.")
         time.sleep(0.25)
     else:
         proc.kill()
-        raise RuntimeError(f"Timeout aguardando Chrome CDP na porta {use_port}.")
+        raise RuntimeError(f"Timeout waiting for Chrome CDP on port {use_port}.")
 
     browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{use_port}")
     context = browser.contexts[0] if browser.contexts else browser.new_context()

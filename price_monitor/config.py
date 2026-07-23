@@ -19,8 +19,8 @@ def load_config(
 
     if not config_path.exists():
         raise FileNotFoundError(
-            f"Arquivo de configuração não encontrado: {config_path}\n"
-            "Copie produtos.exemplo.json para produtos.json e edite."
+            f"Config file not found: {config_path}\n"
+            "Copy produtos.exemplo.json to produtos.json and edit it."
         )
 
     with config_path.open(encoding="utf-8") as fh:
@@ -37,7 +37,7 @@ def load_config(
             if k not in {"products", "produtos"}
         }
     else:
-        raise ValueError("O JSON de configuração deve ser uma lista ou um objeto.")
+        raise ValueError("Config JSON must be a list or an object.")
 
     retailers_cfg = settings.get("retailers") or {}
     if not isinstance(retailers_cfg, dict):
@@ -46,17 +46,17 @@ def load_config(
     products: list[Product] = []
     for item in products_data:
         if not isinstance(item, dict):
-            raise ValueError("Cada produto deve ser um objeto JSON.")
+            raise ValueError("Each product must be a JSON object.")
         retailer = (item.get("retailer") or "").strip().lower()
         url = (item.get("url") or "").strip()
         if not url:
-            raise ValueError("Cada produto precisa de 'url'.")
+            raise ValueError("Each product needs a 'url'.")
         target_price = optional_float(item.get("target_price"))
         if target_price is None:
             label = (item.get("name") or url).strip() or url
-            raise ValueError(f"Produto '{label}' precisa de 'target_price'.")
+            raise ValueError(f"Product '{label}' needs 'target_price'.")
         if target_price <= 0:
-            raise ValueError(f"Produto '{item.get('name') or url}': target_price deve ser > 0.")
+            raise ValueError(f"Product '{item.get('name') or url}': target_price must be > 0.")
 
         # Loja ainda não integrada (pending) — mantém na lista sem adapter.
         if retailer not in KNOWN_RETAILERS or item.get("pending"):
@@ -81,7 +81,7 @@ def load_config(
         products.append(adapter.normalize_product(item, retailer_settings))
 
     if not products and not allow_empty:
-        raise ValueError("Nenhum produto configurado.")
+        raise ValueError("No products configured.")
 
     settings.setdefault("cooldown_hours", DEFAULT_COOLDOWN_HOURS)
     settings["retailers"] = retailers_cfg
@@ -124,13 +124,13 @@ def base_product_fields(data: dict[str, Any], retailer: str) -> dict[str, Any]:
     name = (data.get("name") or "").strip()
     url = (data.get("url") or "").strip()
     if not url:
-        raise ValueError("Cada produto precisa de 'url'.")
+        raise ValueError("Each product needs a 'url'.")
     target_price = optional_float(data.get("target_price"))
     if target_price is None:
         label = name or url
-        raise ValueError(f"Produto '{label}' precisa de 'target_price'.")
+        raise ValueError(f"Product '{label}' needs 'target_price'.")
     if target_price <= 0:
-        raise ValueError(f"Produto '{name or url}': target_price deve ser > 0.")
+        raise ValueError(f"Product '{name or url}': target_price must be > 0.")
     return {
         "retailer": retailer,
         "name": name,  # adapters podem preencher a partir da URL se vazio

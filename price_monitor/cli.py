@@ -14,42 +14,42 @@ DEFAULT_CONFIG = "produtos.json"
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Monitor unificado de preços (Amazon, Safeway, Instacart, Target, Walmart)."
+        description="Unified price monitor (Amazon, Safeway, Instacart, Target, Walmart)."
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    check = sub.add_parser("check", help="Verifica preços e envia alertas.")
+    check = sub.add_parser("check", help="Check prices and send alerts.")
     check.add_argument("--config", default=DEFAULT_CONFIG)
     check.add_argument(
         "--retailer",
         choices=list_retailers(),
         default=None,
-        help="Filtra um varejista (padrão: todos do JSON).",
+        help="Filter one retailer (default: all in the JSON).",
     )
     check.add_argument(
         "--headless",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Força headless ou janela (sobrescreve JSON).",
+        help="Force headless or a visible window (overrides JSON).",
     )
     check.add_argument("--cooldown-hours", type=float, default=None)
 
     auth = sub.add_parser(
         "auth",
-        help="Autenticação OTP (Instacart) com janela visível.",
+        help="OTP authentication (Instacart) with a visible window.",
     )
     auth.add_argument(
         "--retailer",
         choices=list_retailers(),
         required=True,
-        help="Varejista (hoje só instacart usa auth).",
+        help="Retailer (currently only instacart uses auth).",
     )
 
     warm = sub.add_parser(
         "warm",
         help=(
-            "Renova sessão/cookies com janela visível, sem Enter "
-            "(Safeway/Incapsula auto-libera)."
+            "Refresh session/cookies with a visible window, no Enter "
+            "(Safeway/Incapsula auto-clears)."
         ),
     )
     warm.add_argument(
@@ -61,48 +61,48 @@ def build_parser() -> argparse.ArgumentParser:
     warm.add_argument(
         "--reset-profile",
         action="store_true",
-        help="Apaga o perfil do varejista antes do warm (útil se o Walmart queimou a sessão).",
+        help="Delete the retailer profile before warm (useful if Walmart burned the session).",
     )
 
     add = sub.add_parser(
         "add",
-        help="Adiciona produto(s) ao JSON a partir da URL (detecta o varejista).",
+        help="Add product(s) to the JSON from URL (detects the retailer).",
     )
     add.add_argument(
         "urls",
         nargs="*",
-        help="URL(s) do produto. Sem argumentos, entra no modo interativo.",
+        help="Product URL(s). With no arguments, enters interactive mode.",
     )
     add.add_argument("--config", default=DEFAULT_CONFIG)
     add.add_argument(
         "--retailer",
         choices=list_retailers(),
         default=None,
-        help="Força o varejista (padrão: detecta pela URL).",
+        help="Force the retailer (default: detect from URL).",
     )
     add.add_argument(
         "--target-price",
         type=float,
         default=None,
         required=False,
-        help="Preço máximo para alerta (obrigatório).",
+        help="Maximum price for an alert (required).",
     )
     add.add_argument(
         "--min-discount-percent",
         type=float,
         default=None,
-        help="Desconto mínimo %% para alerta.",
+        help="Minimum discount %% for an alert.",
     )
     add.add_argument(
         "--reference-price",
         type=float,
         default=None,
-        help="Preço de referência para calcular desconto.",
+        help="Reference price used to compute discount.",
     )
 
     serve = sub.add_parser(
         "serve",
-        help="Sobe o dashboard web local (http://127.0.0.1:8765).",
+        help="Start the local web dashboard (http://127.0.0.1:8765).",
     )
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
@@ -120,7 +120,7 @@ def _run_add(args: argparse.Namespace, base: Path) -> int:
 
     if args.target_price is None:
         print(
-            "Erro: --target-price é obrigatório ao adicionar URL(s).",
+            "Error: --target-price is required when adding URL(s).",
             file=sys.stderr,
         )
         return 1
@@ -137,10 +137,10 @@ def _run_add(args: argparse.Namespace, base: Path) -> int:
                 retailer=args.retailer,
             )
         except ValueError as exc:
-            print(f"Erro: {exc}", file=sys.stderr)
+            print(f"Error: {exc}", file=sys.stderr)
             errors += 1
             continue
-        label = "Adicionado" if action == "added" else "Atualizado"
+        label = "Added" if action == "added" else "Updated"
         print(
             f"{label}: {entry['retailer']} | {entry['url']} | "
             f"${entry['target_price']:.2f}"
@@ -182,13 +182,13 @@ def main(argv: list[str] | None = None) -> int:
             cooldown_hours=args.cooldown_hours,
         )
     except FileNotFoundError as exc:
-        print(f"Erro: {exc}", file=sys.stderr)
+        print(f"Error: {exc}", file=sys.stderr)
         return 1
     except ValueError as exc:
-        print(f"Erro de configuração: {exc}", file=sys.stderr)
+        print(f"Config error: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
-        print("\nInterrompido pelo usuário.")
+        print("\nInterrupted by user.")
         return 130
 
 

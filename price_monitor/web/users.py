@@ -59,40 +59,40 @@ def normalize_username(username: str) -> str:
 def validate_username(username: str) -> str:
     name = normalize_username(username)
     if "@" in name:
-        raise ValueError("Usuário não pode conter @. Use o campo e-mail para isso.")
+        raise ValueError("Username cannot contain @. Use the email field for that.")
     if not USERNAME_RE.match(name):
         raise ValueError(
-            "Usuário inválido. Use 3–64 caracteres (os mesmos permitidos no e-mail, sem @)."
+            "Invalid username. Use 3–64 characters (same as allowed in email, without @)."
         )
     return name
 
 
 def validate_password(password: str) -> str:
     if not isinstance(password, str) or len(password) < 6:
-        raise ValueError("Senha deve ter pelo menos 6 caracteres.")
+        raise ValueError("Password must be at least 6 characters.")
     if len(password) > 128:
-        raise ValueError("Senha muito longa.")
+        raise ValueError("Password is too long.")
     return password
 
 
 def validate_email(email: str) -> str:
     value = (email or "").strip().lower()
     if not value or not EMAIL_RE.match(value) or len(value) > 120:
-        raise ValueError("E-mail inválido.")
+        raise ValueError("Invalid email.")
     return value
 
 
 def validate_phone(phone: str) -> str:
     digits = re.sub(r"\D", "", (phone or "").strip())
     if len(digits) != 10:
-        raise ValueError("Telefone inválido. Use o formato (xxx) xxx-xxxx.")
+        raise ValueError("Invalid phone number. Use the format (xxx) xxx-xxxx.")
     return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
 
 
 def validate_name(name: str) -> str:
     value = re.sub(r"\s+", " ", (name or "").strip())
     if len(value) < 2 or len(value) > 80:
-        raise ValueError("Nome inválido. Use entre 2 e 80 caracteres.")
+        raise ValueError("Invalid name. Use between 2 and 80 characters.")
     return value
 
 
@@ -153,12 +153,12 @@ class UserStore:
         phone = validate_phone(phone)
         data = self._load()
         if uname in data["users"]:
-            raise ValueError("Esse usuário já existe.")
+            raise ValueError("That username already exists.")
         for other in data["users"].values():
             if not isinstance(other, dict):
                 continue
             if str(other.get("email") or "").lower() == email:
-                raise ValueError("Esse e-mail já está em uso.")
+                raise ValueError("That email is already in use.")
         entry = {
             "username": uname,
             "name": name_value,
@@ -195,12 +195,12 @@ class UserStore:
         data = self._load()
         entry = data["users"].get(name)
         if not isinstance(entry, dict):
-            raise ValueError("Usuário não encontrado.")
+            raise ValueError("User not found.")
         if not verify_password(current_password, str(entry.get("password_hash") or "")):
-            raise ValueError("Senha atual incorreta.")
+            raise ValueError("Current password is incorrect.")
         new_password = validate_password(new_password)
         if verify_password(new_password, str(entry.get("password_hash") or "")):
-            raise ValueError("A nova senha deve ser diferente da atual.")
+            raise ValueError("The new password must be different from the current one.")
         entry["password_hash"] = hash_password(new_password)
         entry["password_changed_at"] = _now()
         entry.pop("reset_token_hash", None)
@@ -247,7 +247,7 @@ class UserStore:
     def reset_password_with_token(self, token: str, new_password: str) -> dict[str, Any]:
         raw = (token or "").strip()
         if len(raw) < 20:
-            raise ValueError("Link de redefinição inválido ou expirado.")
+            raise ValueError("Invalid or expired reset link.")
         token_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
         new_password = validate_password(new_password)
         data = self._load()
@@ -265,14 +265,14 @@ class UserStore:
                 if expires.tzinfo is None:
                     expires = expires.replace(tzinfo=timezone.utc)
             except ValueError:
-                raise ValueError("Link de redefinição inválido ou expirado.") from None
+                raise ValueError("Invalid or expired reset link.") from None
             if expires < now:
-                raise ValueError("Link de redefinição inválido ou expirado.")
+                raise ValueError("Invalid or expired reset link.")
             matched_name = name
             matched_entry = entry
             break
         if not matched_name or not isinstance(matched_entry, dict):
-            raise ValueError("Link de redefinição inválido ou expirado.")
+            raise ValueError("Invalid or expired reset link.")
         matched_entry["password_hash"] = hash_password(new_password)
         matched_entry["password_changed_at"] = _now()
         matched_entry.pop("reset_token_hash", None)

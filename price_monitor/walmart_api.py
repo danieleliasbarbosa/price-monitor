@@ -102,13 +102,13 @@ def fetch_item(item_id: str, settings: dict[str, Any]) -> dict[str, Any]:
     creds = load_api_credentials(settings)
     if creds is None:
         raise WalmartApiError(
-            "SerpApi não configurada para Walmart.\n"
-            "Defina SERPAPI_API_KEY (ou retailers.walmart.serpapi_api_key)."
+            "SerpApi is not configured for Walmart.\n"
+            "Set SERPAPI_API_KEY (or retailers.walmart.serpapi_api_key)."
         )
 
     item_id = str(item_id).strip()
     if not item_id:
-        raise WalmartApiError("product_id Walmart vazio.")
+        raise WalmartApiError("Empty Walmart product_id.")
 
     params: dict[str, str] = {
         "engine": "walmart_product",
@@ -142,15 +142,15 @@ def fetch_item(item_id: str, settings: dict[str, Any]) -> dict[str, Any]:
             f"SerpApi HTTP {exc.code}: {body or exc.reason}"
         ) from exc
     except urllib.error.URLError as exc:
-        raise WalmartApiError(f"SerpApi rede: {exc.reason}") from exc
+        raise WalmartApiError(f"SerpApi network error: {exc.reason}") from exc
 
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise WalmartApiError(f"SerpApi JSON inválido: {raw[:200]}") from exc
+        raise WalmartApiError(f"Invalid SerpApi JSON: {raw[:200]}") from exc
 
     if not isinstance(data, dict):
-        raise WalmartApiError(f"SerpApi: formato inesperado: {type(data)}")
+        raise WalmartApiError(f"SerpApi: unexpected format: {type(data)}")
 
     if data.get("error"):
         raise WalmartApiError(f"SerpApi: {data['error']}")
@@ -162,7 +162,7 @@ def fetch_item(item_id: str, settings: dict[str, Any]) -> dict[str, Any]:
     product = data.get("product_result")
     if not isinstance(product, dict):
         raise WalmartApiError(
-            "SerpApi: product_result ausente "
+            "SerpApi: product_result missing "
             f"(product_id={item_id})."
         )
 
@@ -250,9 +250,9 @@ def describe_offer_context(item: dict[str, Any]) -> str:
 
     stock = item.get("in_stock")
     if stock is False:
-        parts.append("SEM ESTOQUE")
+        parts.append("OUT OF STOCK")
     elif stock is True:
-        parts.append("em estoque")
+        parts.append("in stock")
 
     loc_ship = (item.get("shipping_option") or {}).get("location")
     loc_del = (item.get("delivery_option") or {}).get("location")

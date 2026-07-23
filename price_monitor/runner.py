@@ -58,7 +58,7 @@ def _open_session(
     use_cdp = force_cdp or (_should_use_cdp(retailer, rsettings) and not headless)
     # Em headless + walmart, ainda preferimos CDP com janela no fallback (force_cdp).
     if use_cdp or (force_cdp and retailer == "walmart"):
-        print("  Browser: Chrome CDP (janela real)")
+        print("  Browser: Chrome CDP (real window)")
         session = create_cdp_chrome_session(playwright, profile_dir)
         page = (
             session.context.pages[0]
@@ -88,25 +88,25 @@ def _record_result(
     email_to: str | None = None,
 ) -> None:
     key = adapter.product_key(product)
-    title_preview = scraped.title or "(título não encontrado)"
-    print(f"  Título: {title_preview[:100]}")
+    title_preview = scraped.title or "(title not found)"
+    print(f"  Title: {title_preview[:100]}")
     if scraped.current_price is not None:
-        print(f"  Preço atual: ${scraped.current_price:.2f}")
+        print(f"  Current price: ${scraped.current_price:.2f}")
     else:
-        print("  Preço atual: não encontrado")
+        print("  Current price: not found")
     if scraped.list_price is not None:
-        print(f"  Preço lista: ${scraped.list_price:.2f}")
+        print(f"  List price: ${scraped.list_price:.2f}")
     if scraped.discount_percent is not None:
-        print(f"  Desconto: {scraped.discount_percent:.1f}%")
+        print(f"  Discount: {scraped.discount_percent:.1f}%")
 
     alert, reason = should_alert(product, scraped)
     if not alert:
         status = "ok"
         if scraped.current_price is None:
             status = "unavailable"
-            print("  Status: sem preço / indisponível")
+            print("  Status: no price / unavailable")
         else:
-            print("  Status: sem alerta")
+            print("  Status: no alert")
         print()
         mark_checked(
             state,
@@ -120,7 +120,7 @@ def _record_result(
         return
 
     if cooldown_active(state, key, cooldown):
-        print(f"  Status: alerta elegível, mas em cooldown ({reason})")
+        print(f"  Status: alert eligible, but in cooldown ({reason})")
         print()
         mark_checked(
             state,
@@ -134,7 +134,7 @@ def _record_result(
         save_state(state_path, state)
         return
 
-    print(f"  Status: ALERTA — {reason}")
+    print(f"  Status: ALERT — {reason}")
     dispatch_alert(
         product, scraped, reason, brand=adapter.brand, email_to=email_to
     )
@@ -169,7 +169,7 @@ def run_check(
         retailer_filter = retailer_filter.strip().lower()
         products = [p for p in products if p.retailer == retailer_filter]
         if not products:
-            raise ValueError(f"Nenhum produto para retailer={retailer_filter}")
+            raise ValueError(f"No products for retailer={retailer_filter}")
 
     if url_filter:
         from price_monitor.add_product import _normalize_url_key
@@ -187,10 +187,10 @@ def run_check(
                 filtered.append(product)
         products = filtered
         if not products:
-            raise ValueError(f"Nenhum produto para url={url_filter}")
+            raise ValueError(f"No products for url={url_filter}")
 
     if not products:
-        raise ValueError("Nenhum produto configurado.")
+        raise ValueError("No products configured.")
 
     by_retailer: dict[str, list[Product]] = defaultdict(list)
     for product in products:
@@ -201,17 +201,17 @@ def run_check(
     profiles_root = profile_base or base_dir
     states_root = state_dir or (base_dir / ".state")
 
-    label = "produto único" if url_filter else "Monitor unificado"
-    print(f"{label} — {len(products)} produto(s) em {len(by_retailer)} varejista(s)")
-    print(f"Cooldown global: {cooldown}h")
+    label = "single product" if url_filter else "Unified monitor"
+    print(f"{label} — {len(products)} product(s) across {len(by_retailer)} retailer(s)")
+    print(f"Global cooldown: {cooldown}h")
     print()
 
     for retailer, group in by_retailer.items():
         try:
             adapter = get_adapter(retailer)
         except ValueError:
-            print(f"=== {retailer} ({len(group)} produto(s)) — loja pendente, ignorada ===")
-            print("  Disponível em até 24 horas após o cadastro.")
+            print(f"=== {retailer} ({len(group)} product(s)) — pending store, skipped ===")
+            print("  Available within 24 hours after signup.")
             print()
             continue
         rsettings = retailer_settings(settings, retailer)
@@ -222,8 +222,8 @@ def run_check(
         state_path = (states_root / f"{retailer}.json").resolve()
         state = load_state(state_path)
 
-        print(f"=== {adapter.brand} ({len(group)} produto(s)) ===")
-        print(f"Perfil: {profile_dir}")
+        print(f"=== {adapter.brand} ({len(group)} product(s)) ===")
+        print(f"Profile: {profile_dir}")
         print(f"Headless: {use_headless}")
         print()
 
@@ -231,9 +231,9 @@ def run_check(
             not profile_dir.exists() or not any(profile_dir.iterdir())
         ):
             notify_message(
-                "Perfil Instacart vazio — autentique primeiro.\n"
+                "Empty Instacart profile — authenticate first.\n"
                 "  python -m price_monitor auth --retailer instacart",
-                subject="Instacart: autenticação necessária",
+                subject="Instacart: authentication required",
                 email_to=notify_email,
             )
             return 2
@@ -241,7 +241,7 @@ def run_check(
         # Walmart SerpApi: sem browser / sem PerimeterX
         can_api = getattr(adapter, "can_use_api", None)
         if callable(can_api) and can_api(rsettings):
-            print("  Modo: SerpApi (sem browser)")
+            print("  Mode: SerpApi (no browser)")
             print()
             for idx, product in enumerate(group, start=1):
                 print(f"[{retailer} {idx}/{len(group)}] {product.name}")
@@ -249,7 +249,7 @@ def run_check(
                 try:
                     scraped = adapter.scrape_via_api(product, rsettings)
                 except Exception as exc:
-                    print(f"  ERRO: {exc}")
+                    print(f"  ERROR: {exc}")
                     mark_checked(
                         state,
                         adapter.product_key(product),
@@ -309,7 +309,7 @@ def run_check(
                     except SessionExpiredError as exc:
                         notify_message(
                             str(exc),
-                            subject="Instacart: autenticação necessária",
+                            subject="Instacart: authentication required",
                             email_to=notify_email,
                         )
                         return 2
@@ -321,8 +321,8 @@ def run_check(
                             and fallback
                         ):
                             print(
-                                "  Challenge em headless — abrindo Chrome CDP "
-                                "(resolva Press & Hold se aparecer)..."
+                                "  Challenge in headless — opening Chrome CDP "
+                                "(resolve Press & Hold if it appears)..."
                             )
                             closer()
                             context, page, closer, mode = _open_session(
@@ -347,13 +347,13 @@ def run_check(
                                     set_location=(idx == 1),
                                 )
                             except ChallengeRequiredError as exc2:
-                                print(f"  ERRO: {exc2}")
+                                print(f"  ERROR: {exc2}")
                                 return 1
                         else:
-                            print(f"  ERRO: {exc}")
+                            print(f"  ERROR: {exc}")
                             return 1
                     except Exception as exc:
-                        print(f"  ERRO ao coletar: {exc}")
+                        print(f"  ERROR while scraping: {exc}")
                         mark_checked(
                             state,
                             adapter.product_key(product),
@@ -387,11 +387,11 @@ def run_check(
 def run_auth(*, base_dir: Path, retailer: str) -> int:
     adapter = get_adapter(retailer)
     if not adapter.supports_auth:
-        print(f"{adapter.brand} não usa o comando auth.")
+        print(f"{adapter.brand} does not use the auth command.")
         return 1
 
     profile_dir = profile_dir_for(base_dir, retailer)
-    print(f"Auth {adapter.brand} — perfil: {profile_dir}")
+    print(f"Auth {adapter.brand} — profile: {profile_dir}")
 
     with sync_playwright() as p:
         context = create_context(
@@ -424,7 +424,7 @@ def run_warm(
     adapter = get_adapter(retailer)
     warm_fn = getattr(adapter, "warm_session", None)
     if not callable(warm_fn):
-        print(f"{adapter.brand} não tem warm_session.")
+        print(f"{adapter.brand} has no warm_session.")
         return 1
 
     products, settings = load_config(config_path)
@@ -434,17 +434,17 @@ def run_warm(
 
     profile_dir = profile_dir_for(base_dir, retailer)
     if reset_profile and profile_dir.exists():
-        print(f"Apagando perfil queimado: {profile_dir}")
+        print(f"Deleting burned profile: {profile_dir}")
         shutil.rmtree(profile_dir, ignore_errors=True)
 
-    print(f"Warm {adapter.brand} — perfil: {profile_dir}")
+    print(f"Warm {adapter.brand} — profile: {profile_dir}")
     if retailer == "walmart":
         print(
-            "Modo: Chrome CDP. Se aparecer Press & Hold, SEGURE na janela.\n"
-            "O script espera até 5 minutos (sem Enter)."
+            "Mode: Chrome CDP. If Press & Hold appears, HOLD in the window.\n"
+            "The script waits up to 5 minutes (no Enter)."
         )
     else:
-        print("Modo: janela visível (sem interação humana; só espera auto-liberar)")
+        print("Mode: visible window (no human interaction; just waits to auto-clear)")
 
     with sync_playwright() as p:
         _context, page, closer, _mode = _open_session(

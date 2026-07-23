@@ -50,7 +50,7 @@ class TargetAdapter:
             product_id = target_tcin_from_url(raw_url)
         if not product_id:
             raise ValueError(
-                f"Não foi possível extrair o TCIN da URL Target: {raw_url}"
+                f"Could not extract TCIN from Target URL: {raw_url}"
             )
 
         preselect = data.get("preselect") or target_preselect_from_url(raw_url)
@@ -150,21 +150,21 @@ class TargetAdapter:
             page.wait_for_timeout(500)
 
     def run_auth(self, page: Page) -> int:
-        print("Target não usa subcomando auth. Use check --no-headless se houver challenge.")
+        print("Target does not use the auth command. Use check --no-headless if there is a challenge.")
         return 1
 
     def _wait_challenge(self, page: Page, *, headless: bool) -> None:
         if headless:
             raise ChallengeRequiredError(
-                "Target pediu verificação em headless. Rode:\n"
+                "Target asked for verification in headless mode. Run:\n"
                 "  python -m price_monitor check --retailer target --no-headless"
             )
         print("\n" + "=" * 60)
-        print("AVISO: Target pediu captcha / verificação.")
-        print("Resolva no navegador e pressione Enter.")
+        print("WARNING: Target asked for a captcha / verification.")
+        print("Solve it in the browser, then press Enter.")
         print("=" * 60 + "\n")
         try:
-            input("Pressione Enter após resolver... ")
+            input("Press Enter after solving... ")
         except EOFError:
             time.sleep(60)
         try:

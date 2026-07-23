@@ -91,7 +91,7 @@ function formatRemaining(seconds) {
   const minutes = Math.floor((total % 3600) / 60);
   if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}min`;
   if (minutes > 0) return `${minutes}min`;
-  return "menos de 1min";
+  return "less than 1 min";
 }
 
 function applyCheckCooldown(checkCd) {
@@ -106,7 +106,7 @@ function applyCheckCooldown(checkCd) {
     checkAllowed = true;
     els.btnCheck.disabled = false;
     els.btnCheck.removeAttribute("aria-disabled");
-    els.btnCheck.textContent = "Verificar preços";
+    els.btnCheck.textContent = "Check prices";
     if (els.checkCooldownHint) {
       els.checkCooldownHint.hidden = true;
       els.checkCooldownHint.textContent = "";
@@ -115,11 +115,11 @@ function applyCheckCooldown(checkCd) {
   }
   els.btnCheck.disabled = true;
   els.btnCheck.setAttribute("aria-disabled", "true");
-  els.btnCheck.textContent = "Verificar preços";
+  els.btnCheck.textContent = "Check prices";
   if (els.checkCooldownHint) {
     els.checkCooldownHint.hidden = false;
     els.checkCooldownHint.textContent =
-      `Próxima verificação em ${formatRemaining(remaining)}.`;
+      `Next check in ${formatRemaining(remaining)}.`;
   }
   const waitMs = Math.min(Math.max(remaining, 1) * 1000, 60_000);
   checkCooldownTimer = setTimeout(async () => {
@@ -139,20 +139,20 @@ function money(value) {
 function fmtTime(iso) {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString("en-US");
   } catch {
     return iso;
   }
 }
 
 function statusLabel(last) {
-  if (!last) return { text: "sem check", cls: "" };
+  if (!last) return { text: "not checked", cls: "" };
   const map = {
-    ok: { text: "sem alerta", cls: "ok" },
-    unavailable: { text: "indisponível", cls: "error" },
-    alert: { text: "ALERTA", cls: "alert" },
+    ok: { text: "no alert", cls: "ok" },
+    unavailable: { text: "unavailable", cls: "error" },
+    alert: { text: "ALERT", cls: "alert" },
     cooldown: { text: "cooldown", cls: "cooldown" },
-    error: { text: "erro", cls: "error" },
+    error: { text: "error", cls: "error" },
   };
   return map[last.status] || { text: last.status || "—", cls: "" };
 }
@@ -210,7 +210,7 @@ async function checkUsernameAvailability() {
   const username = els.authUser.value.trim();
   if (username.length < 3) {
     usernameAvailable = null;
-    setUsernameHint(username ? "Digite pelo menos 3 caracteres." : "", username ? "error" : null);
+    setUsernameHint(username ? "Enter at least 3 characters." : "", username ? "error" : null);
     return;
   }
   try {
@@ -219,15 +219,15 @@ async function checkUsernameAvailability() {
     );
     usernameAvailable = data.available;
     if (data.available === false) {
-      setUsernameHint(data.message || "Já existe um usuário com esse nome.", "error");
+      setUsernameHint(data.message || "That username is already taken.", "error");
     } else if (data.available === true) {
-      setUsernameHint(data.message || "Usuário disponível.", "ok");
+      setUsernameHint(data.message || "Username available.", "ok");
     } else {
       setUsernameHint(data.message || "", null);
     }
   } catch (err) {
     usernameAvailable = null;
-    setUsernameHint("Não foi possível verificar o usuário.", "error");
+    setUsernameHint("Could not check username.", "error");
   }
 }
 
@@ -255,11 +255,11 @@ function setAuthMode(mode) {
   }
 
   if (isForgot) {
-    els.authSubmit.textContent = "Enviar link";
+    els.authSubmit.textContent = "Send link";
   } else if (isReset) {
-    els.authSubmit.textContent = "Salvar nova senha";
+    els.authSubmit.textContent = "Save new password";
   } else {
-    els.authSubmit.textContent = isRegister ? "Criar conta" : "Entrar";
+    els.authSubmit.textContent = isRegister ? "Create account" : "Sign in";
   }
 
   els.authUser.autocomplete = isRegister ? "off" : "username";
@@ -338,11 +338,11 @@ function setAuthMode(mode) {
   if (lede) {
     if (isForgot) {
       lede.textContent =
-        "Informe o e-mail da conta. Enviaremos um link para redefinir a senha.";
+        "Enter the account email. We will send a password reset link.";
     } else if (isReset) {
-      lede.textContent = "Escolha uma nova senha para a sua conta.";
+      lede.textContent = "Choose a new password for your account.";
     } else {
-      lede.textContent = "Entre para ver e gerenciar a sua lista de produtos.";
+      lede.textContent = "Sign in to view and manage your product list.";
     }
   }
 }
@@ -352,9 +352,9 @@ function resetPasswordVisibility() {
     const input = document.getElementById(btn.dataset.target);
     if (!input) return;
     input.type = "password";
-    btn.textContent = "Mostrar";
+    btn.textContent = "Show";
     btn.setAttribute("aria-pressed", "false");
-    btn.setAttribute("aria-label", "Mostrar senha");
+    btn.setAttribute("aria-label", "Show password");
   });
 }
 
@@ -364,9 +364,9 @@ document.querySelectorAll(".password-toggle").forEach((btn) => {
     if (!input) return;
     const showing = input.type === "text";
     input.type = showing ? "password" : "text";
-    btn.textContent = showing ? "Mostrar" : "Ocultar";
+    btn.textContent = showing ? "Show" : "Hide";
     btn.setAttribute("aria-pressed", showing ? "false" : "true");
-    btn.setAttribute("aria-label", showing ? "Mostrar senha" : "Ocultar senha");
+    btn.setAttribute("aria-label", showing ? "Show password" : "Hide password");
   });
 });
 
@@ -378,7 +378,7 @@ function formatPhoneMask(value) {
 }
 
 function formatMoneyMask(value) {
-  // Até 999,999,999,999,999.99 -> 17 dígitos (15 inteiros + 2 centavos)
+  // Up to 999,999,999,999,999.99 -> 17 digits (15 integer + 2 cents)
   let digits = String(value || "").replace(/\D/g, "").slice(0, 17);
   if (!digits) return "";
   digits = digits.replace(/^0+(?=\d)/, "");
@@ -392,7 +392,7 @@ function formatMoneyMask(value) {
 function parseMoneyValue(value) {
   const normalized = String(value || "").replace(/,/g, "").trim();
   if (!normalized) return NaN;
-  // Mantém precisão para valores grandes no envio (API aceita float).
+  // Keep precision for large values on submit (API accepts float).
   const num = Number(normalized);
   return Number.isFinite(num) ? num : NaN;
 }
@@ -476,11 +476,11 @@ function applyAccountVisibility() {
   const hidden = localStorage.getItem(HIDE_ACCOUNT_KEY) === "1";
   els.accountBody.hidden = hidden;
   els.btnToggleAccount.setAttribute("aria-expanded", hidden ? "false" : "true");
-  els.btnToggleAccount.textContent = hidden ? "Mostrar dados" : "Ocultar dados";
+  els.btnToggleAccount.textContent = hidden ? "Show details" : "Hide details";
   if (els.accountSubtitle) {
     els.accountSubtitle.textContent = hidden
-      ? "Dados ocultos."
-      : "Seus dados e alteração de senha.";
+      ? "Details hidden."
+      : "Your details and password change.";
   }
 }
 
@@ -504,15 +504,15 @@ function resetPasswordFormFields() {
     const input = document.getElementById(btn.dataset.target);
     if (!input) return;
     input.type = "password";
-    btn.textContent = "Mostrar";
+    btn.textContent = "Show";
     btn.setAttribute("aria-pressed", "false");
-    btn.setAttribute("aria-label", "Mostrar senha");
+    btn.setAttribute("aria-label", "Show password");
   });
 }
 
 function openPasswordForm() {
   if (!els.passwordForm) return;
-  // Garante que a seção de conta está visível.
+  // Make sure the account section is visible.
   if (els.accountBody?.hidden) {
     localStorage.removeItem(HIDE_ACCOUNT_KEY);
     applyAccountVisibility();
@@ -542,7 +542,7 @@ function renderProducts(products) {
   currentProducts = Array.isArray(products) ? products : [];
   els.list.innerHTML = "";
   els.empty.hidden = currentProducts.length > 0;
-  els.boardMeta.textContent = `${currentProducts.length} item(ns)`;
+  els.boardMeta.textContent = `${currentProducts.length} item(s)`;
 
   let below = 0;
   let known = 0;
@@ -555,31 +555,31 @@ function renderProducts(products) {
     if (last?.status === "unavailable") unavailable += 1;
 
     const st = p.pending
-      ? { text: "loja nova · disponível em 24h", cls: "cooldown" }
+      ? { text: "new store · available in 24h", cls: "cooldown" }
       : statusLabel(last);
     const row = document.createElement("article");
     row.className = "product";
     row.innerHTML = `
       <div>
         <span class="store">${escapeHtml(p.brand || p.retailer)}</span>
-        <h3 class="name">${escapeHtml(p.name || "Sem nome")}</h3>
+        <h3 class="name">${escapeHtml(p.name || "Unnamed")}</h3>
         <p class="product-url"><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.url)}</a></p>
         <p class="meta">${
           p.pending
-            ? "Loja nova, vai estar disponível em 24 horas."
+            ? "New store — available in 24 hours."
             : last?.checked_at
-              ? `check ${fmtTime(last.checked_at)}`
-              : "ainda não verificado"
+              ? `checked ${fmtTime(last.checked_at)}`
+              : "not checked yet"
         }${last?.error ? ` · ${escapeHtml(last.error)}` : ""}</p>
       </div>
       <div class="prices">
         <div class="current ${p.below_target ? "good" : last?.current_price != null ? "bad" : ""}">${money(last?.current_price)}</div>
-        <div class="target">alvo ${money(p.target_price)}</div>
-        <div class="delta">${p.delta_to_target == null ? "" : (p.delta_to_target <= 0 ? "" : "+") + money(p.delta_to_target).replace("$", "") + " vs alvo"}</div>
+        <div class="target">target ${money(p.target_price)}</div>
+        <div class="delta">${p.delta_to_target == null ? "" : (p.delta_to_target <= 0 ? "" : "+") + money(p.delta_to_target).replace("$", "") + " vs target"}</div>
       </div>
       <div class="status ${st.cls}">
         ${st.text}
-        <div><button type="button" class="btn ghost" data-remove="${index}">remover</button></div>
+        <div><button type="button" class="btn ghost" data-remove="${index}">remove</button></div>
       </div>
     `;
     els.list.appendChild(row);
@@ -588,23 +588,23 @@ function renderProducts(products) {
   els.summary.hidden = false;
   const pills = els.summaryPills || els.summary;
   pills.innerHTML = `
-    <div class="pill"><strong>${currentProducts.length}</strong> produtos</div>
-    <div class="pill"><strong>${known}</strong> com preço</div>
-    <div class="pill"><strong>${below}</strong> no alvo ou abaixo</div>
-    <div class="pill"><strong>${unavailable}</strong> indisponível</div>
+    <div class="pill"><strong>${currentProducts.length}</strong> products</div>
+    <div class="pill"><strong>${known}</strong> with price</div>
+    <div class="pill"><strong>${below}</strong> at or below target</div>
+    <div class="pill"><strong>${unavailable}</strong> unavailable</div>
   `;
 
   els.list.querySelectorAll("[data-remove]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.getAttribute("data-remove"));
       if (!Number.isInteger(idx)) return;
-      if (!confirm("Remover este produto da sua lista?")) return;
+      if (!confirm("Remove this product from your list?")) return;
       try {
         await api(`/api/products/${idx}`, { method: "DELETE" });
         await loadProducts();
         if (els.formMsg) {
           els.formMsg.classList.remove("error");
-          els.formMsg.textContent = "Produto removido.";
+          els.formMsg.textContent = "Product removed.";
         }
       } catch (err) {
         if (err.status === 401) return showAuth();
@@ -623,7 +623,7 @@ async function loadMeta() {
   const meta = await api("/api/meta");
   const select = els.retailerFilter;
   const current = select.value;
-  select.innerHTML = `<option value="">todas</option>`;
+  select.innerHTML = `<option value="">all</option>`;
   for (const r of meta.retailers || []) {
     const opt = document.createElement("option");
     opt.value = r;
@@ -693,7 +693,7 @@ els.authForm.addEventListener("submit", async (event) => {
     const email = (els.forgotEmail?.value || "").trim();
     if (!email) {
       els.authMsg.classList.add("error");
-      els.authMsg.textContent = "Informe o e-mail da conta.";
+      els.authMsg.textContent = "Enter the account email.";
       return;
     }
     try {
@@ -704,7 +704,7 @@ els.authForm.addEventListener("submit", async (event) => {
       });
       els.authMsg.textContent =
         result.message ||
-        "Se esse e-mail estiver cadastrado, você receberá um link.";
+        "If that email is registered, you will receive a link.";
     } catch (err) {
       els.authMsg.classList.add("error");
       els.authMsg.textContent = err.message;
@@ -719,17 +719,17 @@ els.authForm.addEventListener("submit", async (event) => {
     const confirm = els.authPassConfirm.value;
     if (!password || !confirm) {
       els.authMsg.classList.add("error");
-      els.authMsg.textContent = "Preencha todos os campos obrigatórios.";
+      els.authMsg.textContent = "Fill in all required fields.";
       return;
     }
     if (password !== confirm) {
       els.authMsg.classList.add("error");
-      els.authMsg.textContent = "As senhas não coincidem.";
+      els.authMsg.textContent = "Passwords do not match.";
       return;
     }
     if (!resetToken) {
       els.authMsg.classList.add("error");
-      els.authMsg.textContent = "Link de redefinição inválido ou expirado.";
+      els.authMsg.textContent = "Invalid or expired reset link.";
       return;
     }
     try {
@@ -748,7 +748,7 @@ els.authForm.addEventListener("submit", async (event) => {
       window.history.replaceState({}, "", url.pathname + url.search);
       setAuthMode("login");
       els.authMsg.textContent =
-        result.message || "Senha redefinida. Entre com a nova senha.";
+        result.message || "Password reset. Sign in with your new password.";
     } catch (err) {
       els.authMsg.classList.add("error");
       els.authMsg.textContent = err.message;
@@ -762,7 +762,7 @@ els.authForm.addEventListener("submit", async (event) => {
   const password = els.authPass.value;
   if (!username || !password) {
     els.authMsg.classList.add("error");
-    els.authMsg.textContent = "Preencha todos os campos obrigatórios.";
+    els.authMsg.textContent = "Fill in all required fields.";
     return;
   }
 
@@ -773,24 +773,24 @@ els.authForm.addEventListener("submit", async (event) => {
     const confirm = els.authPassConfirm.value;
     if (!name || !email || !phone || !confirm) {
       els.authMsg.classList.add("error");
-      els.authMsg.textContent = "Preencha todos os campos obrigatórios.";
+      els.authMsg.textContent = "Fill in all required fields.";
       return;
     }
     if (password !== confirm) {
       els.authMsg.classList.add("error");
-      els.authMsg.textContent = "As senhas não coincidem.";
+      els.authMsg.textContent = "Passwords do not match.";
       return;
     }
     const phoneDigits = phone.replace(/\D/g, "");
     if (phoneDigits.length !== 10) {
       els.authMsg.classList.add("error");
-      els.authMsg.textContent = "Telefone inválido. Use o formato (xxx) xxx-xxxx.";
+      els.authMsg.textContent = "Invalid phone. Use the format (xxx) xxx-xxxx.";
       return;
     }
     await checkUsernameAvailability();
     if (usernameAvailable === false) {
       els.authMsg.classList.add("error");
-      els.authMsg.textContent = "Já existe um usuário com esse nome.";
+      els.authMsg.textContent = "That username is already taken.";
       return;
     }
   }
@@ -812,12 +812,12 @@ els.authForm.addEventListener("submit", async (event) => {
     els.authPassConfirm.value = "";
     resetPasswordVisibility();
     clearUsernameCheck();
-    // Memorizar usuário só no login; cadastro não salva o campo.
+    // Remember username only on sign-in; registration does not save the field.
     if (authMode === "login") {
       saveRememberPreference(result.user.username);
     }
     if (result.imported_legacy) {
-      els.authMsg.textContent = "Conta criada e produtos.json importado.";
+      els.authMsg.textContent = "Account created and produtos.json imported.";
     }
     await enterApp(result.user.username, result.user);
   } catch (err) {
@@ -844,7 +844,7 @@ els.btnLogout.addEventListener("click", async () => {
   } catch {
     /* ignore */
   }
-  // Se não memorizar, limpa o usuário; senha sempre limpa.
+  // If not remembering, clear the username; password is always cleared.
   if (!els.authRemember.checked) {
     localStorage.removeItem(REMEMBER_FLAG_KEY);
     localStorage.removeItem(REMEMBER_USER_KEY);
@@ -864,12 +864,12 @@ els.passwordForm.addEventListener("submit", async (event) => {
   const confirmPassword = els.confirmNewPassword.value;
   if (!currentPassword || !newPassword || !confirmPassword) {
     els.passwordMsg.classList.add("error");
-    els.passwordMsg.textContent = "Preencha todos os campos de senha.";
+    els.passwordMsg.textContent = "Fill in all password fields.";
     return;
   }
   if (newPassword !== confirmPassword) {
     els.passwordMsg.classList.add("error");
-    els.passwordMsg.textContent = "As senhas novas não coincidem.";
+    els.passwordMsg.textContent = "New passwords do not match.";
     return;
   }
   try {
@@ -886,10 +886,10 @@ els.passwordForm.addEventListener("submit", async (event) => {
       const input = document.getElementById(btn.dataset.target);
       if (!input) return;
       input.type = "password";
-      btn.textContent = "Mostrar";
+      btn.textContent = "Show";
       btn.setAttribute("aria-pressed", "false");
     });
-    els.passwordMsg.textContent = result.message || "Senha alterada com sucesso.";
+    els.passwordMsg.textContent = result.message || "Password changed successfully.";
     setTimeout(() => closePasswordForm(), 1200);
   } catch (err) {
     if (err.status === 401) return showAuth();
@@ -901,7 +901,7 @@ els.passwordForm.addEventListener("submit", async (event) => {
 els.btnCheck.addEventListener("click", async () => {
   if (!checkAllowed || els.btnCheck.disabled) return;
   els.btnCheck.disabled = true;
-  els.jobStatus.textContent = "verificando…";
+  els.jobStatus.textContent = "checking…";
   els.logOutput.textContent = "";
   try {
     const body = {};
@@ -932,13 +932,13 @@ els.addForm.addEventListener("submit", async (event) => {
   const url = els.urlInput.value.trim();
   if (urlAlreadyInList(url)) {
     els.formMsg.classList.add("error");
-    els.formMsg.textContent = "Essa URL já está na sua lista de produtos.";
+    els.formMsg.textContent = "That URL is already in your product list.";
     return;
   }
   const targetPrice = parseMoneyValue(els.targetInput.value);
   if (!Number.isFinite(targetPrice) || targetPrice <= 0) {
     els.formMsg.classList.add("error");
-    els.formMsg.textContent = "Informe um preço alvo válido (ex.: 5.00).";
+    els.formMsg.textContent = "Enter a valid target price (e.g. 5.00).";
     return;
   }
   try {
@@ -954,18 +954,18 @@ els.addForm.addEventListener("submit", async (event) => {
     });
     if (result.pending_store) {
       els.formMsg.textContent =
-        "Produto adicionado. Loja nova, vai estar disponível em 24 horas.";
+        "Product added. New store — available in 24 hours.";
     } else if (result.check_message) {
       els.formMsg.textContent = result.check_message;
     } else {
-      els.formMsg.textContent = "Produto adicionado.";
+      els.formMsg.textContent = "Product added.";
     }
     els.addForm.reset();
     await loadProducts();
-    // Mantém "Produto adicionado." até a verificação terminar de verdade.
+      // Keep "Product added." until the check truly finishes.
     if (result.check_started && result.job_id) {
-      els.formMsg.textContent = "Produto adicionado.";
-      els.jobStatus.textContent = "verificando produto adicionado…";
+      els.formMsg.textContent = "Product added.";
+      els.jobStatus.textContent = "checking added product…";
       els.logOutput.textContent = "";
       if (pollTimer) clearTimeout(pollTimer);
       const jobId = result.job_id;
@@ -976,12 +976,12 @@ els.addForm.addEventListener("submit", async (event) => {
         if (waitMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, waitMs));
         }
-        els.formMsg.textContent = "Produto adicionado e preço verificado.";
+        els.formMsg.textContent = "Product added and price checked.";
       } catch (err) {
         if (err.status === 401) return showAuth();
         els.formMsg.classList.add("error");
         els.formMsg.textContent =
-          err.message || "Produto adicionado, mas a verificação falhou.";
+          err.message || "Product added, but the check failed.";
       }
     }
   } catch (err) {

@@ -21,8 +21,8 @@ from price_monitor.urls import (
 
 PAGE_SETTLE_MS = 3_500
 AUTH_REQUIRED_MSG = (
-    "Sessão Instacart inválida ou expirada (login/OTP necessário).\n"
-    "Rode:\n"
+    "Instacart session invalid or expired (login/OTP required).\n"
+    "Run:\n"
     "  python -m price_monitor auth --retailer instacart"
 )
 
@@ -53,7 +53,7 @@ class InstacartAdapter:
             product_id = instacart_product_id_from_url(raw_url)
         if not product_id:
             raise ValueError(
-                f"Não foi possível extrair o product_id da URL Instacart: {raw_url}"
+                f"Could not extract product_id from Instacart URL: {raw_url}"
             )
 
         retailer_slug = (
@@ -89,7 +89,7 @@ class InstacartAdapter:
         )
         page.wait_for_timeout(PAGE_SETTLE_MS)
         if self._looks_like_challenge(page) or self._looks_like_login_or_otp(page):
-            notify_message(AUTH_REQUIRED_MSG, subject="Instacart: autenticação necessária")
+            notify_message(AUTH_REQUIRED_MSG, subject="Instacart: authentication required")
             raise SessionExpiredError(AUTH_REQUIRED_MSG)
 
     def scrape(
@@ -129,9 +129,9 @@ class InstacartAdapter:
         return ScrapedProduct(title, current, list_price, None)
 
     def run_auth(self, page: Page) -> int:
-        print("Abrindo Instacart para autenticação OTP (SMS)...")
-        print("1. Faça login e digite o código no navegador.")
-        print("2. Quando estiver logado, volte aqui e pressione Enter.")
+        print("Opening Instacart for OTP authentication (SMS)...")
+        print("1. Log in and enter the code in the browser.")
+        print("2. When you are logged in, come back here and press Enter.")
         print()
         page.goto(
             "https://www.instacart.com/",
@@ -140,17 +140,17 @@ class InstacartAdapter:
         )
         page.wait_for_timeout(PAGE_SETTLE_MS)
         try:
-            input("Pressione Enter quando estiver logado no Instacart... ")
+            input("Press Enter when you are logged into Instacart... ")
         except EOFError:
             time.sleep(120)
         page.wait_for_timeout(1500)
         if self._looks_like_challenge(page):
-            print("Ainda há challenge/captcha. Resolva e rode auth de novo.")
+            print("Challenge/captcha still present. Solve it and run auth again.")
             return 1
         if self._looks_like_login_or_otp(page):
-            print("Ainda parece tela de login/OTP. Complete e rode auth de novo.")
+            print("Still looks like a login/OTP screen. Finish it and run auth again.")
             return 1
-        print("Perfil salvo. Pode rodar: python -m price_monitor check --retailer instacart")
+        print("Profile saved. You can run: python -m price_monitor check --retailer instacart")
         return 0
 
     def _page_text_lower(self, page: Page) -> str:
@@ -216,7 +216,7 @@ class InstacartAdapter:
     def _maybe_set_zip(self, page: Page, zip_code: str) -> None:
         zip_code = zip_code.strip()
         if not re.fullmatch(r"\d{5}(-\d{4})?", zip_code):
-            print(f"  Aviso: CEP inválido ignorado: {zip_code}")
+            print(f"  Warning: invalid ZIP ignored: {zip_code}")
             return
         for sel in [
             "button:has-text('Address')",
@@ -250,9 +250,9 @@ class InstacartAdapter:
             except Exception:
                 continue
         if filled:
-            print(f"  Tentativa de definir CEP/endereço: {zip_code}")
+            print(f"  Tried to set ZIP/address: {zip_code}")
         else:
-            print(f"  Não foi possível definir CEP automaticamente ({zip_code}).")
+            print(f"  Could not set ZIP automatically ({zip_code}).")
 
     def _from_json_ld(self, page: Page):
         try:

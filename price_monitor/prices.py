@@ -63,7 +63,7 @@ def should_alert(product, scraped) -> tuple[bool, str]:
         and scraped.current_price <= product.target_price
     ):
         reasons.append(
-            f"preço ${scraped.current_price:.2f} <= alvo ${product.target_price:.2f}"
+            f"price ${scraped.current_price:.2f} <= target ${product.target_price:.2f}"
         )
 
     if (
@@ -72,7 +72,7 @@ def should_alert(product, scraped) -> tuple[bool, str]:
         and scraped.discount_percent >= product.min_discount_percent
     ):
         reasons.append(
-            f"desconto {scraped.discount_percent:.1f}% >= mínimo "
+            f"discount {scraped.discount_percent:.1f}% >= minimum "
             f"{product.min_discount_percent:.1f}%"
         )
 

@@ -30,13 +30,13 @@ def user_dirname(username: str) -> str:
 def user_root(data_dir: Path, username: str) -> Path:
     name = (username or "").strip().lower()
     if not name:
-        raise ValueError("Username vazio.")
+        raise ValueError("Empty username.")
     dirname = user_dirname(name)
     root = (data_dir / "users" / dirname).resolve()
     # Evita path traversal fora de .data/users
     users_root = (data_dir / "users").resolve()
     if users_root not in root.parents and root != users_root:
-        raise ValueError(f"Username inválido para path: {username!r}")
+        raise ValueError(f"Invalid username for path: {username!r}")
     root.mkdir(parents=True, exist_ok=True)
     (root / ".state").mkdir(parents=True, exist_ok=True)
     return root

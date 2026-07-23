@@ -26,12 +26,12 @@ def _load_raw(config_path: Path) -> dict[str, Any]:
     if isinstance(raw, list):
         return {"products": raw}
     if not isinstance(raw, dict):
-        raise ValueError("O JSON de configuração deve ser uma lista ou um objeto.")
+        raise ValueError("Config JSON must be a list or an object.")
     raw.setdefault("products", raw.get("produtos") or [])
     if "produtos" in raw and "products" not in raw:
         raw["products"] = raw.pop("produtos")
     if not isinstance(raw["products"], list):
-        raise ValueError("'products' deve ser uma lista.")
+        raise ValueError("'products' must be a list.")
     return raw
 
 
@@ -44,13 +44,13 @@ def _save_raw(config_path: Path, raw: dict[str, Any]) -> None:
 
 def _parse_target_price(value: Any) -> float:
     if value is None or value == "":
-        raise ValueError("target_price é obrigatório.")
+        raise ValueError("target_price is required.")
     try:
         price = float(str(value).replace(",", ".").replace("$", "").strip())
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"target_price inválido: {value}") from exc
+        raise ValueError(f"Invalid target_price: {value}") from exc
     if price <= 0:
-        raise ValueError("target_price deve ser > 0.")
+        raise ValueError("target_price must be > 0.")
     return price
 
 
@@ -103,17 +103,17 @@ def add_url_to_config(
     """
     url = (url or "").strip()
     if not url:
-        raise ValueError("URL vazia.")
+        raise ValueError("Empty URL.")
     if not url.lower().startswith(("http://", "https://")):
         url = "https://" + url
 
     name_value = re.sub(r"\s+", " ", (name or "").strip())
     if len(name_value) > 200:
-        raise ValueError("Nome do produto muito longo (máx. 200 caracteres).")
+        raise ValueError("Product name is too long (max. 200 characters).")
 
     if target_price is None:
         raise ValueError(
-            "target_price é obrigatório. Use --target-price ou informe no prompt."
+            "target_price is required. Use --target-price or enter it at the prompt."
         )
     target_price = _parse_target_price(target_price)
 
@@ -121,7 +121,7 @@ def add_url_to_config(
     retailer = (retailer or detected or "").strip().lower()
     if detected and retailer and retailer != detected:
         raise ValueError(
-            f"URL parece ser de '{detected}', mas --retailer={retailer} foi informado."
+            f"URL looks like '{detected}', but --retailer={retailer} was provided."
         )
 
     raw = _load_raw(config_path)
@@ -133,15 +133,15 @@ def add_url_to_config(
         slug = retailer or retailer_slug_from_url(url)
         if not slug:
             raise ValueError(
-                "Não foi possível identificar a loja pela URL. "
-                "Use uma URL válida (ex.: amazon.com, walmart.com)."
+                "Could not identify the store from the URL. "
+                "Use a valid URL (e.g. amazon.com, walmart.com)."
             )
         for existing in products:
             if not isinstance(existing, dict):
                 continue
             existing_url = _normalize_url_key(str(existing.get("url") or ""))
             if existing_url and existing_url in incoming_urls:
-                raise ValueError("Essa URL já está na sua lista de produtos.")
+                raise ValueError("That URL is already in your product list.")
         available_after = (
             datetime.now(timezone.utc) + timedelta(hours=24)
         ).isoformat()
@@ -187,7 +187,7 @@ def add_url_to_config(
             continue
         existing_url = _normalize_url_key(str(existing.get("url") or ""))
         if existing_url and existing_url in incoming_urls:
-            raise ValueError("Essa URL já está na sua lista de produtos.")
+            raise ValueError("That URL is already in your product list.")
 
     products.append(entry)
     _save_raw(config_path, raw)
@@ -201,9 +201,9 @@ def prompt_add_interactive(
 ) -> int:
     """Loop interativo: cola URL + preço alvo até linha vazia."""
     print(f"Config: {config_path}")
-    print("Cole a URL do produto (Enter vazio para sair).")
-    print("Varejistas: amazon, safeway, instacart, target")
-    print("target_price é obrigatório.\n")
+    print("Paste the product URL (empty Enter to exit).")
+    print("Retailers: amazon, safeway, instacart, target")
+    print("target_price is required.\n")
     added = 0
     while True:
         try:
@@ -222,7 +222,7 @@ def prompt_add_interactive(
                     if default_target_price is not None
                     else ""
                 )
-                price_raw = input(f"Preço alvo{hint}: ").strip()
+                price_raw = input(f"Target price{hint}: ").strip()
             except EOFError:
                 print()
                 return 0 if added else 1
@@ -231,7 +231,7 @@ def prompt_add_interactive(
                 target_price = default_target_price
                 break
             if not price_raw:
-                print("  target_price é obrigatório.")
+                print("  target_price is required.")
                 continue
             try:
                 target_price = _parse_target_price(price_raw)
@@ -245,14 +245,14 @@ def prompt_add_interactive(
                 target_price=target_price,
             )
         except ValueError as exc:
-            print(f"  Erro: {exc}")
+            print(f"  Error: {exc}")
             continue
 
         print(
-            f"  Adicionado: {entry['retailer']} | {entry['url']} | "
+            f"  Added: {entry['retailer']} | {entry['url']} | "
             f"${entry['target_price']:.2f}"
         )
         added += 1
 
-    print(f"\nPronto. {added} produto(s) processado(s).")
+    print(f"\nDone. {added} product(s) processed.")
     return 0

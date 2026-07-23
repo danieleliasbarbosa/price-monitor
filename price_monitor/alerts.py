@@ -19,19 +19,19 @@ def format_alert(
 ) -> str:
     title = scraped.title or product.name
     lines = [
-        f"Alerta {brand}",
-        f"Produto: {product.name}",
-        f"Título: {title}",
-        f"Motivo: {reason}",
+        f"{brand} alert",
+        f"Product: {product.name}",
+        f"Title: {title}",
+        f"Reason: {reason}",
     ]
     if scraped.current_price is not None:
-        lines.append(f"Preço atual: ${scraped.current_price:.2f}")
+        lines.append(f"Current price: ${scraped.current_price:.2f}")
     if scraped.list_price is not None:
-        lines.append(f"Preço lista: ${scraped.list_price:.2f}")
+        lines.append(f"List price: ${scraped.list_price:.2f}")
     if product.reference_price is not None:
-        lines.append(f"Preço referência: ${product.reference_price:.2f}")
+        lines.append(f"Reference price: ${product.reference_price:.2f}")
     if scraped.discount_percent is not None:
-        lines.append(f"Desconto: {scraped.discount_percent:.1f}%")
+        lines.append(f"Discount: {scraped.discount_percent:.1f}%")
     if product.asin:
         lines.append(f"ASIN: {product.asin}")
     if product.product_id:
@@ -57,7 +57,7 @@ def send_telegram(message: str) -> bool:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return 200 <= resp.status < 300
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        print(f"[telegram] Falha ao enviar: {exc}")
+        print(f"[telegram] Failed to send: {exc}")
         return False
 
 
@@ -76,14 +76,14 @@ def dispatch_alert(
         )
 
     message = format_alert(product, scraped, reason, brand=brand)
-    subject = f"Alerta {brand}: {product.name}"
+    subject = f"{brand} alert: {product.name}"
 
     sent_any = False
     if send_telegram(message):
-        print("[alerta] Enviado via Telegram.")
+        print("[alert] Sent via Telegram.")
         sent_any = True
     if send_email(subject, message, to=email_to):
-        print("[alerta] Enviado via e-mail.")
+        print("[alert] Sent via email.")
         sent_any = True
 
     if not sent_any:

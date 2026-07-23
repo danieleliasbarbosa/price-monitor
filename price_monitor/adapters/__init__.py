@@ -18,7 +18,7 @@ _ADAPTERS = {
 def get_adapter(name: str):
     key = (name or "").strip().lower()
     if key not in _ADAPTERS:
-        raise ValueError(f"Retailer desconhecido: {name}. Use: {', '.join(_ADAPTERS)}")
+        raise ValueError(f"Unknown retailer: {name}. Use: {', '.join(_ADAPTERS)}")
     return _ADAPTERS[key]
 
 

@@ -32,7 +32,7 @@ def send_email(
     """
     email_to = (to or os.getenv("EMAIL_TO", "")).strip()
     if not email_to:
-        print("[email] Destinatário ausente (to / EMAIL_TO).")
+        print("[email] Missing recipient (to / EMAIL_TO).")
         return False
 
     if send_resend(subject, message, to=email_to, html=html):
@@ -77,7 +77,7 @@ def _send_resend_sdk(api_key: str, payload: dict[str, object], *, to: str) -> bo
         print(f"[email] Resend OK -> {to}: {result}")
         return True
     except Exception as exc:
-        print(f"[email] Resend SDK falhou: {exc}")
+        print(f"[email] Resend SDK failed: {exc}")
         return False
 
 
@@ -104,10 +104,10 @@ def _send_resend_http(api_key: str, payload: dict[str, object], *, to: str) -> b
             return ok
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        print(f"[email] Resend HTTP falhou ({exc.code}): {body}")
+        print(f"[email] Resend HTTP failed ({exc.code}): {body}")
         return False
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        print(f"[email] Resend HTTP falhou: {exc}")
+        print(f"[email] Resend HTTP failed: {exc}")
         return False
 
 
@@ -124,7 +124,7 @@ def send_smtp(subject: str, message: str, *, to: str) -> bool:
     try:
         port = int(port_raw)
     except ValueError:
-        print(f"[email] SMTP_PORT inválida: {port_raw}")
+        print(f"[email] Invalid SMTP_PORT: {port_raw}")
         return False
 
     msg = MIMEText(message, _charset="utf-8")
@@ -151,5 +151,5 @@ def send_smtp(subject: str, message: str, *, to: str) -> bool:
                 smtp.sendmail(email_from, [to], msg.as_string())
         return True
     except Exception as exc:
-        print(f"[email] SMTP falhou: {exc}")
+        print(f"[email] SMTP failed: {exc}")
         return False

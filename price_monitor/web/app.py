@@ -118,10 +118,10 @@ def _current_username(request: Request) -> str | None:
 def require_user(request: Request) -> str:
     username = _current_username(request)
     if not username:
-        raise HTTPException(status_code=401, detail="Faça login para continuar.")
+        raise HTTPException(status_code=401, detail="Please log in to continue.")
     if _user_store().get(username) is None:
         request.session.clear()
-        raise HTTPException(status_code=401, detail="Sessão inválida. Entre de novo.")
+        raise HTTPException(status_code=401, detail="Invalid session. Please log in again.")
     ensure_user_config(
         _data_dir(),
         username,
@@ -218,7 +218,7 @@ def create_app() -> FastAPI:
         store = _user_store()
         entry = store.get(username)
         if entry is None:
-            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+            raise HTTPException(status_code=404, detail="User not found.")
         return {"user": store.public_profile(entry)}
 
     @app.post("/api/auth/change-password")
@@ -226,7 +226,7 @@ def create_app() -> FastAPI:
         body: ChangePasswordBody, username: str = Depends(require_user)
     ) -> dict[str, Any]:
         if body.new_password != body.confirm_password:
-            raise HTTPException(status_code=400, detail="As senhas novas não coincidem.")
+            raise HTTPException(status_code=400, detail="New passwords do not match.")
         try:
             _user_store().change_password(
                 username,
@@ -235,7 +235,7 @@ def create_app() -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {"ok": True, "message": "Senha alterada com sucesso."}
+        return {"ok": True, "message": "Password changed successfully."}
 
     @app.get("/api/auth/check-username")
     def auth_check_username(username: str = "") -> dict[str, Any]:
@@ -246,30 +246,30 @@ def create_app() -> FastAPI:
             return {
                 "username": name,
                 "available": None,
-                "message": "Digite pelo menos 3 caracteres.",
+                "message": "Enter at least 3 characters.",
             }
         if "@" in name:
             return {
                 "username": name,
                 "available": False,
-                "message": "Usuário não pode conter @.",
+                "message": "Username cannot contain @.",
             }
         if not USERNAME_RE.match(name):
             return {
                 "username": name,
                 "available": False,
-                "message": "Caracteres inválidos. Use os mesmos do e-mail (sem @/espaço).",
+                "message": "Invalid characters. Use the same ones allowed in email (no @/space).",
             }
         if _user_store().exists(name):
             return {
                 "username": name,
                 "available": False,
-                "message": "Já existe um usuário com esse nome.",
+                "message": "A user with that username already exists.",
             }
         return {
             "username": name,
             "available": True,
-            "message": "Usuário disponível.",
+            "message": "Username available.",
         }
 
     @app.post("/api/auth/register")
@@ -305,7 +305,7 @@ def create_app() -> FastAPI:
     def auth_login(body: AuthBody, request: Request) -> dict[str, Any]:
         user = _user_store().authenticate(body.username, body.password)
         if not user:
-            raise HTTPException(status_code=401, detail="Usuário ou senha inválidos.")
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
         ensure_user_config(
             _data_dir(),
             user["username"],
@@ -330,8 +330,8 @@ def create_app() -> FastAPI:
         generic = {
             "ok": True,
             "message": (
-                "Se esse e-mail estiver cadastrado, você receberá um link "
-                "para redefinir a senha."
+                "If that email is registered, you will receive a link "
+                "to reset your password."
             ),
         }
         result = _user_store().create_password_reset_token(body.email)
@@ -340,22 +340,22 @@ def create_app() -> FastAPI:
         token, profile = result
         base = os.getenv("APP_BASE_URL", "http://127.0.0.1:8765").rstrip("/")
         reset_url = f"{base}/?reset={token}"
-        name = str(profile.get("name") or profile.get("username") or "usuário")
-        subject = "Redefinir senha — price-monitor"
+        name = str(profile.get("name") or profile.get("username") or "user")
+        subject = "Reset password — price-monitor"
         text = (
-            f"Olá, {name}.\n\n"
-            "Recebemos um pedido para redefinir a senha da sua conta no price-monitor.\n"
-            f"Abra este link (válido por 1 hora):\n{reset_url}\n\n"
-            "Se você não pediu isso, ignore este e-mail.\n"
+            f"Hi, {name}.\n\n"
+            "We received a request to reset the password for your price-monitor account.\n"
+            f"Open this link (valid for 1 hour):\n{reset_url}\n\n"
+            "If you did not request this, ignore this email.\n"
         )
         html = (
-            f"<p>Olá, <strong>{name}</strong>.</p>"
-            "<p>Recebemos um pedido para redefinir a senha da sua conta no "
-            "<strong>price-monitor</strong>.</p>"
-            f'<p><a href="{reset_url}">Clique aqui para criar uma nova senha</a> '
-            "(válido por 1 hora).</p>"
+            f"<p>Hi, <strong>{name}</strong>.</p>"
+            "<p>We received a request to reset the password for your "
+            "<strong>price-monitor</strong> account.</p>"
+            f'<p><a href="{reset_url}">Click here to create a new password</a> '
+            "(valid for 1 hour).</p>"
             f"<p style=\"word-break:break-all;color:#666;font-size:12px\">{reset_url}</p>"
-            "<p>Se você não pediu isso, ignore este e-mail.</p>"
+            "<p>If you did not request this, ignore this email.</p>"
         )
         email_to = str(profile.get("email") or "").strip()
         sent = False
@@ -365,8 +365,8 @@ def create_app() -> FastAPI:
             return {
                 "ok": False,
                 "message": (
-                    "Não foi possível enviar o e-mail agora. "
-                    "Tente de novo em instantes ou confira a caixa de spam."
+                    "Could not send the email right now. "
+                    "Try again shortly or check your spam folder."
                 ),
             }
         return generic
@@ -374,7 +374,7 @@ def create_app() -> FastAPI:
     @app.post("/api/auth/reset-password")
     def auth_reset_password(body: ResetPasswordBody) -> dict[str, Any]:
         if body.new_password != body.confirm_password:
-            raise HTTPException(status_code=400, detail="As senhas não coincidem.")
+            raise HTTPException(status_code=400, detail="Passwords do not match.")
         try:
             user = _user_store().reset_password_with_token(
                 body.token, body.new_password
@@ -383,7 +383,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {
             "ok": True,
-            "message": "Senha redefinida. Entre com a nova senha.",
+            "message": "Password reset. Sign in with your new password.",
             "user": user,
         }
 
@@ -493,7 +493,7 @@ def create_app() -> FastAPI:
                 response["check_started"] = True
             else:
                 response["check_message"] = (
-                    "Produto adicionado, mas há outra verificação em andamento."
+                    "Product added, but another check is already in progress."
                 )
         return response
 
@@ -503,7 +503,7 @@ def create_app() -> FastAPI:
     ) -> dict[str, Any]:
         path = _config_for(username)
         if not path.exists():
-            raise HTTPException(status_code=404, detail="Configuração não encontrada")
+            raise HTTPException(status_code=404, detail="Configuration not found")
 
         raw = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(raw, list):
@@ -517,7 +517,7 @@ def create_app() -> FastAPI:
                 k: v for k, v in raw.items() if k not in {"products", "produtos"}
             }
         if index < 0 or index >= len(products):
-            raise HTTPException(status_code=404, detail="Índice inválido")
+            raise HTTPException(status_code=404, detail="Invalid index")
         removed = products.pop(index)
 
         # Limpa preço/alerta salvos desse produto para não reaparecer ao readicionar.
@@ -638,7 +638,7 @@ def create_app() -> FastAPI:
         body = body or CheckBody()
         retailer = (body.retailer or "").strip().lower() or None
         if retailer and retailer not in list_retailers():
-            raise HTTPException(status_code=400, detail=f"Retailer inválido: {retailer}")
+            raise HTTPException(status_code=400, detail=f"Invalid retailer: {retailer}")
 
         check_cd = get_check_cooldown(
             _data_dir(), username, hours=CHECK_COOLDOWN_HOURS
@@ -649,8 +649,8 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=429,
                 detail=(
-                    "Você já verificou os preços. "
-                    f"Próxima verificação em {hours}h {minutes:02d}min."
+                    "You already checked prices. "
+                    f"Next check in {hours}h {minutes:02d}min."
                 ),
             )
 
@@ -659,7 +659,7 @@ def create_app() -> FastAPI:
         )
         if started is None:
             raise HTTPException(
-                status_code=409, detail="Já há uma verificação em andamento."
+                status_code=409, detail="A check is already in progress."
             )
         return started
 
@@ -669,7 +669,7 @@ def create_app() -> FastAPI:
     ) -> dict[str, Any]:
         job = _jobs.get(job_id)
         if not job or job.get("user") != username:
-            raise HTTPException(status_code=404, detail="Job não encontrado")
+            raise HTTPException(status_code=404, detail="Job not found")
         return job
 
     @app.get("/api/check-latest")

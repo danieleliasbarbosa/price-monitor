@@ -56,7 +56,7 @@ class SafewayAdapter:
             product_id = safeway_product_id_from_url(raw_url)
         if not product_id:
             raise ValueError(
-                f"Não foi possível extrair o product_id da URL Safeway: {raw_url}"
+                f"Could not extract product_id from Safeway URL: {raw_url}"
             )
 
         fields["url"] = safeway_canonical_url(product_id, raw_url)
@@ -167,7 +167,7 @@ class SafewayAdapter:
 
     def run_auth(self, page: Page) -> int:
         print(
-            "Safeway não usa OTP. Para renovar a sessão sem digitar Enter:\n"
+            "Safeway does not use OTP. To refresh the session without pressing Enter:\n"
             "  python -m price_monitor warm --retailer safeway"
         )
         return 1
@@ -185,7 +185,7 @@ class SafewayAdapter:
         """
         url = (product_url or "").strip() or WARM_URL
         print(f"  Warm Safeway: {url}")
-        print("  Aguardando Incapsula liberar automaticamente (sem interação)...")
+        print("  Waiting for Incapsula to clear automatically (no interaction)...")
         page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         page.wait_for_timeout(PAGE_SETTLE_MS)
 
@@ -194,15 +194,15 @@ class SafewayAdapter:
         while time.monotonic() < deadline:
             if product_url:
                 if self._has_product_payload(page):
-                    print("  Warm OK — página do produto liberada.")
+                    print("  Warm OK — product page cleared.")
                     return True
             else:
                 if self._home_ready(page):
-                    print("  Warm OK — home liberada.")
+                    print("  Warm OK — home page cleared.")
                     return True
             page.wait_for_timeout(PRODUCT_READY_POLL_MS)
 
-        print("  Warm falhou — Incapsula não liberou a tempo.")
+        print("  Warm failed — Incapsula did not clear in time.")
         return False
 
     def _home_ready(self, page: Page) -> bool:
@@ -220,26 +220,26 @@ class SafewayAdapter:
     def _wait_challenge(self, page: Page, *, headless: bool) -> None:
         if headless:
             raise ChallengeRequiredError(
-                "Safeway pediu verificação (Incapsula) em headless.\n"
-                "Sem interação humana, use uma destas opções:\n"
+                "Safeway asked for verification (Incapsula) in headless mode.\n"
+                "Without human interaction, use one of these options:\n"
                 "  1) python -m price_monitor warm --retailer safeway\n"
-                "     (janela visível; espera auto-liberar e grava cookies)\n"
-                "  2) Desative headed_fallback e rode warm periodicamente:\n"
+                "     (visible window; waits to auto-clear and saves cookies)\n"
+                "  2) Disable headed_fallback and run warm periodically:\n"
                 "       python -m price_monitor warm --retailer safeway\n"
-                "  3) Ou force janela: check --retailer safeway --no-headless"
+                "  3) Or force a window: check --retailer safeway --no-headless"
             )
-        print("  Incapsula detectado — aguardando liberação automática (sem Enter)...")
+        print("  Incapsula detected — waiting for automatic clear (no Enter)...")
         deadline = time.monotonic() + (HEADED_CHALLENGE_WAIT_MS / 1000)
         while time.monotonic() < deadline:
             if self._has_product_payload(page) or (
                 not self._looks_like_challenge(page) and len(page.content()) > 20_000
             ):
-                print("  Incapsula liberou automaticamente.")
+                print("  Incapsula cleared automatically.")
                 return
             page.wait_for_timeout(PRODUCT_READY_POLL_MS)
         raise ChallengeRequiredError(
-            "Safeway não liberou o Incapsula a tempo (sem interação).\n"
-            "Tente de novo mais tarde ou rode:\n"
+            "Safeway did not clear Incapsula in time (no interaction).\n"
+            "Try again later or run:\n"
             "  python -m price_monitor warm --retailer safeway"
         )
 
@@ -304,7 +304,7 @@ class SafewayAdapter:
     def _maybe_set_zip(self, page: Page, zip_code: str) -> None:
         zip_code = zip_code.strip()
         if not re.fullmatch(r"\d{5}(-\d{4})?", zip_code):
-            print(f"  Aviso: CEP inválido ignorado: {zip_code}")
+            print(f"  Warning: invalid ZIP ignored: {zip_code}")
             return
         for sel in [
             "button:has-text('Select Store')",
@@ -352,9 +352,9 @@ class SafewayAdapter:
             except Exception:
                 continue
         if filled:
-            print(f"  Tentativa de definir CEP/loja: {zip_code}")
+            print(f"  Tried to set ZIP/store: {zip_code}")
         else:
-            print(f"  Não foi possível definir CEP automaticamente ({zip_code}).")
+            print(f"  Could not set ZIP automatically ({zip_code}).")
 
     def _from_json_ld(self, page: Page):
         try:

@@ -24,6 +24,18 @@ def detect_retailer_from_url(url: str) -> str | None:
     return None
 
 
+def retailer_slug_from_url(url: str) -> str | None:
+    """Extrai um slug de loja a partir do host (ex.: newegg.com -> newegg)."""
+    host = (urlparse(url).netloc or "").lower().strip()
+    if not host:
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    label = host.split(".", 1)[0].strip()
+    label = re.sub(r"[^a-z0-9-]+", "", label)
+    return label or None
+
+
 def amazon_asin_from_url(url: str) -> str | None:
     patterns = [
         r"/(?:dp|gp/product|product)/([A-Z0-9]{10})(?:[/?]|$)",

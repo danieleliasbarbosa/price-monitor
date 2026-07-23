@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-import smtplib
 import urllib.error
 import urllib.parse
 import urllib.request
-from email.mime.text import MIMEText
 
+from price_monitor.mail import send_email
 from price_monitor.models import Product, ScrapedProduct
 from price_monitor.prices import calc_discount
 
@@ -62,59 +61,14 @@ def send_telegram(message: str) -> bool:
         return False
 
 
-def send_email(subject: str, message: str) -> bool:
-    host = os.getenv("SMTP_HOST", "").strip()
-    port_raw = os.getenv("SMTP_PORT", "").strip()
-    user = os.getenv("SMTP_USER", "").strip()
-    password = os.getenv("SMTP_PASS", "").strip()
-    email_from = os.getenv("EMAIL_FROM", "").strip() or user
-    email_to = os.getenv("EMAIL_TO", "").strip()
-
-    if not host or not port_raw or not email_to:
-        return False
-
-    try:
-        port = int(port_raw)
-    except ValueError:
-        print(f"[email] SMTP_PORT inválida: {port_raw}")
-        return False
-
-    msg = MIMEText(message, _charset="utf-8")
-    msg["Subject"] = subject
-    msg["From"] = email_from
-    msg["To"] = email_to
-
-    try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=30) as smtp:
-                if user:
-                    smtp.login(user, password)
-                smtp.sendmail(email_from, [email_to], msg.as_string())
-        else:
-            with smtplib.SMTP(host, port, timeout=30) as smtp:
-                smtp.ehlo()
-                try:
-                    smtp.starttls()
-                    smtp.ehlo()
-                except smtplib.SMTPException:
-                    pass
-                if user:
-                    smtp.login(user, password)
-                smtp.sendmail(email_from, [email_to], msg.as_string())
-        return True
-    except Exception as exc:
-        print(f"[email] Falha ao enviar: {exc}")
-        return False
-
-
 def dispatch_alert(
     product: Product,
     scraped: ScrapedProduct,
     reason: str,
     *,
     brand: str,
+    email_to: str | None = None,
 ) -> None:
-    # Ensure discount is filled if possible
     if scraped.discount_percent is None:
         scraped.discount_percent = calc_discount(
             scraped.current_price,
@@ -128,7 +82,7 @@ def dispatch_alert(
     if send_telegram(message):
         print("[alerta] Enviado via Telegram.")
         sent_any = True
-    if send_email(subject, message):
+    if send_email(subject, message, to=email_to):
         print("[alerta] Enviado via e-mail.")
         sent_any = True
 
@@ -138,9 +92,14 @@ def dispatch_alert(
         print("-" * 60 + "\n")
 
 
-def notify_message(message: str, *, subject: str = "Price monitor") -> None:
+def notify_message(
+    message: str,
+    *,
+    subject: str = "Price monitor",
+    email_to: str | None = None,
+) -> None:
     print("\n" + "!" * 60)
     print(message)
     print("!" * 60 + "\n")
     send_telegram(message)
-    send_email(subject, message)
+    send_email(subject, message, to=email_to)

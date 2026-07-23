@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>price-monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css?v=14" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <section id="authScreen" class="auth-screen" hidden>
+    <div class="auth-panel">
+      <p class="eyebrow">local · privado</p>
+      <h1 class="brand auth-brand">price-monitor</h1>
+      <p class="lede">Entre para ver e gerenciar a sua lista de produtos.</p>
+
+      <div class="auth-tabs" role="tablist" id="authTabs">
+        <button type="button" class="auth-tab is-active" data-mode="login" role="tab">Entrar</button>
+        <button type="button" class="auth-tab" data-mode="register" role="tab">Criar conta</button>
+      </div>
+
+      <form id="authForm" class="auth-form">
+        <label id="nameField" class="field" hidden>
+          <span>Nome <em class="req">*</em></span>
+          <input id="authName" name="name" type="text" autocomplete="name" required minlength="2" maxlength="80" placeholder="ex.: xxx xxx" />
+        </label>
+        <label class="field" id="usernameField">
+          <span>Usuário <em class="req">*</em></span>
+          <input id="authUser" name="username" autocomplete="username" required minlength="3" maxlength="64" placeholder="ex.: xxx123" />
+          <small id="usernameHint" class="field-hint" aria-live="polite"></small>
+        </label>
+        <div id="registerFields" class="register-fields" hidden>
+          <label class="field">
+            <span>E-mail <em class="req">*</em></span>
+            <input id="authEmail" name="email" type="email" autocomplete="email" required maxlength="120" placeholder="xxx@gmail.com" />
+          </label>
+          <label class="field">
+            <span>Telefone <em class="req">*</em></span>
+            <input id="authPhone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" required maxlength="14" placeholder="(650) 555-0100" />
+          </label>
+        </div>
+        <label class="field" id="forgotEmailField" hidden>
+          <span>E-mail da conta <em class="req">*</em></span>
+          <input id="forgotEmail" name="forgot_email" type="email" autocomplete="email" maxlength="120" placeholder="xxx@gmail.com" />
+        </label>
+        <label class="field" id="passwordField">
+          <span>Senha <em class="req">*</em></span>
+          <div class="password-wrap">
+            <input id="authPass" name="password" type="password" autocomplete="current-password" required minlength="6" placeholder="mín. 6 caracteres" />
+            <button type="button" class="password-toggle" data-target="authPass" aria-label="Mostrar senha" aria-pressed="false">Mostrar</button>
+          </div>
+        </label>
+        <label id="confirmPassField" class="field" hidden>
+          <span>Repetir senha <em class="req">*</em></span>
+          <div class="password-wrap">
+            <input id="authPassConfirm" name="password_confirm" type="password" autocomplete="new-password" required minlength="6" placeholder="digite a senha de novo" />
+            <button type="button" class="password-toggle" data-target="authPassConfirm" aria-label="Mostrar senha" aria-pressed="false">Mostrar</button>
+          </div>
+        </label>
+        <label id="rememberUserField" class="remember-user">
+          <input id="authRemember" type="checkbox" />
+          <span>Memorizar usuário</span>
+        </label>
+        <button type="submit" class="btn primary auth-submit" id="authSubmit">Entrar</button>
+      </form>
+      <p class="auth-links" id="authLinks" hidden>
+        <button type="button" class="linkish" id="forgotPasswordLink">Esqueci a senha</button>
+      </p>
+      <p class="auth-links" id="backToLoginWrap" hidden>
+        <button type="button" class="linkish" id="backToLogin">Voltar ao login</button>
+      </p>
+      <p id="authMsg" class="form-msg" role="status"></p>
+      <p class="required-note"><em class="req">*</em> Campo obrigatório</p>
+    </div>
+  </section>
+
+  <div id="appShell" hidden>
+    <header class="top">
+      <div class="brand-block">
+        <p class="eyebrow">local · windows</p>
+        <h1 class="brand">price-monitor</h1>
+        <p class="lede">Olá, <strong id="userLabel">—</strong>. Acompanhe alvos e rode verificações na sua lista.</p>
+      </div>
+      <div class="actions">
+        <button type="button" id="btnLogout" class="btn ghost">Sair</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="account" id="accountSection" aria-labelledby="account-title">
+        <div class="section-head account-head">
+          <div>
+            <h2 id="account-title">Minha conta</h2>
+            <p class="muted" id="accountSubtitle">Seus dados e alteração de senha.</p>
+          </div>
+          <button type="button" id="btnToggleAccount" class="btn ghost" aria-controls="accountBody" aria-expanded="true">
+            Ocultar dados
+          </button>
+        </div>
+        <div id="accountBody" class="account-body">
+          <div class="account-grid">
+            <div class="account-info">
+              <p><span>Nome</span><strong id="profileName">—</strong></p>
+              <p><span>Usuário</span><strong id="profileUsername">—</strong></p>
+              <p><span>E-mail</span><strong id="profileEmail">—</strong></p>
+              <p><span>Telefone</span><strong id="profilePhone">—</strong></p>
+              <button type="button" id="btnChangePassword" class="btn">Alterar senha</button>
+            </div>
+            <form id="passwordForm" class="password-form" hidden>
+              <h3>Alterar senha</h3>
+              <label class="field">
+                <span>Senha atual <em class="req">*</em></span>
+                <div class="password-wrap">
+                  <input id="currentPassword" type="password" required minlength="6" autocomplete="current-password" />
+                  <button type="button" class="password-toggle" data-target="currentPassword" aria-label="Mostrar senha" aria-pressed="false">Mostrar</button>
+                </div>
+              </label>
+              <label class="field">
+                <span>Nova senha <em class="req">*</em></span>
+                <div class="password-wrap">
+                  <input id="newPassword" type="password" required minlength="6" autocomplete="new-password" />
+                  <button type="button" class="password-toggle" data-target="newPassword" aria-label="Mostrar senha" aria-pressed="false">Mostrar</button>
+                </div>
+              </label>
+              <label class="field">
+                <span>Repetir nova senha <em class="req">*</em></span>
+                <div class="password-wrap">
+                  <input id="confirmNewPassword" type="password" required minlength="6" autocomplete="new-password" />
+                  <button type="button" class="password-toggle" data-target="confirmNewPassword" aria-label="Mostrar senha" aria-pressed="false">Mostrar</button>
+                </div>
+              </label>
+              <div class="password-actions">
+                <button type="submit" class="btn primary">Salvar nova senha</button>
+                <button type="button" id="btnCancelPassword" class="btn ghost">Cancelar</button>
+              </div>
+              <p id="passwordMsg" class="form-msg" role="status"></p>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="summary" id="summary" hidden aria-label="Resumo">
+        <div id="summaryPills" class="summary-pills"></div>
+        <div class="summary-controls">
+          <div class="check-action">
+            <button type="button" id="btnCheck" class="btn primary">Verificar preços</button>
+            <p id="checkCooldownHint" class="check-cooldown-hint" hidden></p>
+          </div>
+          <label class="field compact summary-store">
+            <span>Loja</span>
+            <select id="retailerFilter">
+              <option value="">todas</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="board" aria-labelledby="board-title">
+        <div class="section-head">
+          <h2 id="board-title">Produtos</h2>
+          <p id="boardMeta" class="muted"></p>
+        </div>
+        <div id="productList" class="product-list"></div>
+        <p id="emptyState" class="empty" hidden>Nenhum produto na sua lista. Adicione uma URL abaixo.</p>
+      </section>
+
+      <section class="compose" aria-labelledby="add-title">
+        <div class="section-head">
+          <h2 id="add-title">Adicionar URL</h2>
+          <p class="muted">Detecta a loja automaticamente.</p>
+        </div>
+        <form id="addForm" class="add-form">
+          <label class="field grow">
+            <span>URL do produto <em class="req">*</em></span>
+            <input id="urlInput" type="url" required placeholder="https://www.walmart.com/ip/..." />
+          </label>
+          <label class="field grow">
+            <span>Nome do produto</span>
+            <input id="productNameInput" type="text" maxlength="200" />
+          </label>
+          <label class="field">
+            <span>Preço alvo (USD) <em class="req">*</em></span>
+            <input id="targetInput" type="text" inputmode="decimal" required maxlength="22" placeholder="0.00" autocomplete="off" />
+          </label>
+          <button type="submit" class="btn">Adicionar</button>
+        </form>
+        <p class="required-note"><em class="req">*</em> Campo obrigatório</p>
+        <p id="formMsg" class="form-msg" role="status"></p>
+      </section>
+
+      <section class="log-panel" aria-labelledby="log-title">
+        <div class="section-head">
+          <h2 id="log-title">Log da verificação</h2>
+          <p id="jobStatus" class="muted">Nenhuma verificação nesta sessão.</p>
+        </div>
+        <pre id="logOutput" class="log"></pre>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js?v=29"></script>
+</body>
+</html>

@@ -22,37 +22,35 @@
       "headed_fallback": true,
       "use_cdp": true,
       "browser_fallback": false,
-      "publisher_id": "SEU_IMPACT_PUBLISHER_ID",
-      "consumer_id": "SEU_CONSUMER_ID",
-      "key_version": "1",
-      "private_key_path": ".secrets/walmart_private.pem"
+      "zip": "94080",
+      "store_id": "2280"
     }
   },
   "products": [
     {
       "retailer": "amazon",
       "url": "https://www.amazon.com/Arrowhead-Spring-Water-Bottles-Still-Bottled-Minerals-Electrolytes/dp/B000R5NRPI/ref=sr_1_1?keywords=arrowhead",
-      "target_price": 6.0
+      "target_price": 3.0
     },
     {
       "retailer": "safeway",
       "url": "https://www.safeway.com/shop/product-details.108200131.html",
-      "target_price": 5.0
+      "target_price": 3.0
     },
     {
       "retailer": "instacart",
       "url": "https://www.instacart.com/products/69274902-arrowhead-wtr-40169-arrowhead-spring-water-40-pack-05-liter1918284?retailerSlug=costco-business-center",
-      "target_price": 3.0
+      "target_price": 6.0
     },
     {
       "retailer": "target",
       "url": "https://www.target.com/p/arrowhead-100-mountain-spring-water/-/A-94935328?preselect=84793249#lnk=sametab",
-      "target_price": 5.0
+      "target_price": 4.0
     },
     {
       "retailer": "walmart",
       "url": "https://www.walmart.com/ip/ARROWHEAD-Brand-100-Mountain-Spring-Water-16-9-ounce-plastic-bottles-Pack-of-35/43240608",
-      "target_price": 5.0
+      "target_price": 4.4
     }
   ]
 }

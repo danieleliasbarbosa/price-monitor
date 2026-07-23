@@ -6,6 +6,7 @@ from pathlib import Path
 
 from price_monitor.adapters import list_retailers
 from price_monitor.add_product import add_url_to_config, prompt_add_interactive
+from price_monitor.envfile import load_dotenv
 from price_monitor.runner import run_auth, run_check, run_warm
 
 DEFAULT_CONFIG = "produtos.json"
@@ -13,7 +14,7 @@ DEFAULT_CONFIG = "produtos.json"
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Monitor unificado de preços (Amazon, Safeway, Instacart, Target)."
+        description="Monitor unificado de preços (Amazon, Safeway, Instacart, Target, Walmart)."
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -98,6 +99,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Preço de referência para calcular desconto.",
     )
+
+    serve = sub.add_parser(
+        "serve",
+        help="Sobe o dashboard web local (http://127.0.0.1:8765).",
+    )
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8765)
+
     return parser
 
 
@@ -142,6 +151,7 @@ def _run_add(args: argparse.Namespace, base: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     base = Path.cwd()
+    load_dotenv(base / ".env", override=True)
 
     try:
         if args.command == "auth":
@@ -157,6 +167,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "add":
             return _run_add(args, base)
+
+        if args.command == "serve":
+            from price_monitor.web import run_server
+
+            run_server(host=args.host, port=args.port)
+            return 0
 
         return run_check(
             config_path=(base / args.config).resolve(),

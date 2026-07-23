@@ -18,7 +18,13 @@ from price_monitor.config import (
 )
 from price_monitor.models import ChallengeRequiredError, Product, SessionExpiredError
 from price_monitor.prices import should_alert
-from price_monitor.state import cooldown_active, load_state, mark_alerted, save_state
+from price_monitor.state import (
+    cooldown_active,
+    load_state,
+    mark_alerted,
+    mark_checked,
+    save_state,
+)
 
 
 def profile_dir_for(base: Path, retailer: str) -> Path:
@@ -71,6 +77,81 @@ def _open_session(
     return context, page, context.close, "playwright"
 
 
+def _record_result(
+    *,
+    adapter,
+    product: Product,
+    scraped,
+    state: dict[str, Any],
+    state_path: Path,
+    cooldown: float,
+    email_to: str | None = None,
+) -> None:
+    key = adapter.product_key(product)
+    title_preview = scraped.title or "(título não encontrado)"
+    print(f"  Título: {title_preview[:100]}")
+    if scraped.current_price is not None:
+        print(f"  Preço atual: ${scraped.current_price:.2f}")
+    else:
+        print("  Preço atual: não encontrado")
+    if scraped.list_price is not None:
+        print(f"  Preço lista: ${scraped.list_price:.2f}")
+    if scraped.discount_percent is not None:
+        print(f"  Desconto: {scraped.discount_percent:.1f}%")
+
+    alert, reason = should_alert(product, scraped)
+    if not alert:
+        status = "ok"
+        if scraped.current_price is None:
+            status = "unavailable"
+            print("  Status: sem preço / indisponível")
+        else:
+            print("  Status: sem alerta")
+        print()
+        mark_checked(
+            state,
+            key,
+            title=scraped.title,
+            current_price=scraped.current_price,
+            list_price=scraped.list_price,
+            status=status,
+        )
+        save_state(state_path, state)
+        return
+
+    if cooldown_active(state, key, cooldown):
+        print(f"  Status: alerta elegível, mas em cooldown ({reason})")
+        print()
+        mark_checked(
+            state,
+            key,
+            title=scraped.title,
+            current_price=scraped.current_price,
+            list_price=scraped.list_price,
+            status="cooldown",
+            reason=reason,
+        )
+        save_state(state_path, state)
+        return
+
+    print(f"  Status: ALERTA — {reason}")
+    dispatch_alert(
+        product, scraped, reason, brand=adapter.brand, email_to=email_to
+    )
+    mark_alerted(state, key, reason, scraped.current_price)
+    mark_checked(
+        state,
+        key,
+        title=scraped.title,
+        current_price=scraped.current_price,
+        list_price=scraped.list_price,
+        status="alert",
+        reason=reason,
+    )
+    save_state(state_path, state)
+    print()
+
+
 def run_check(
     *,
     config_path: Path,
@@ -78,13 +159,38 @@ def run_check(
     retailer_filter: str | None,
     headless: bool | None,
     cooldown_hours: float | None,
+    state_dir: Path | None = None,
+    profile_base: Path | None = None,
+    url_filter: str | None = None,
+    notify_email: str | None = None,
 ) -> int:
-    products, settings = load_config(config_path)
+    products, settings = load_config(config_path, allow_empty=True)
     if retailer_filter:
         retailer_filter = retailer_filter.strip().lower()
         products = [p for p in products if p.retailer == retailer_filter]
         if not products:
             raise ValueError(f"Nenhum produto para retailer={retailer_filter}")
+
+    if url_filter:
+        from price_monitor.add_product import _normalize_url_key
+
+        wanted = {
+            _normalize_url_key(url_filter),
+        }
+        filtered: list[Product] = []
+        for product in products:
+            keys = {_normalize_url_key(product.url)}
+            raw = product.raw if isinstance(product.raw, dict) else {}
+            if raw.get("url"):
+                keys.add(_normalize_url_key(str(raw.get("url"))))
+            if keys & wanted:
+                filtered.append(product)
+        products = filtered
+        if not products:
+            raise ValueError(f"Nenhum produto para url={url_filter}")
+
+    if not products:
+        raise ValueError("Nenhum produto configurado.")
 
     by_retailer: dict[str, list[Product]] = defaultdict(list)
     for product in products:
@@ -92,19 +198,28 @@ def run_check(
 
     cooldown = resolve_cooldown(settings, cooldown_hours)
     exit_code = 0
+    profiles_root = profile_base or base_dir
+    states_root = state_dir or (base_dir / ".state")
 
-    print(f"Monitor unificado — {len(products)} produto(s) em {len(by_retailer)} varejista(s)")
+    label = "produto único" if url_filter else "Monitor unificado"
+    print(f"{label} — {len(products)} produto(s) em {len(by_retailer)} varejista(s)")
     print(f"Cooldown global: {cooldown}h")
     print()
 
     for retailer, group in by_retailer.items():
-        adapter = get_adapter(retailer)
+        try:
+            adapter = get_adapter(retailer)
+        except ValueError:
+            print(f"=== {retailer} ({len(group)} produto(s)) — loja pendente, ignorada ===")
+            print("  Disponível em até 24 horas após o cadastro.")
+            print()
+            continue
         rsettings = retailer_settings(settings, retailer)
         use_headless = resolve_headless(
             settings, retailer, headless, adapter.default_headless
         )
-        profile_dir = profile_dir_for(base_dir, retailer)
-        state_path = state_path_for(base_dir, retailer)
+        profile_dir = (profiles_root / ".profiles" / retailer).resolve()
+        state_path = (states_root / f"{retailer}.json").resolve()
         state = load_state(state_path)
 
         print(f"=== {adapter.brand} ({len(group)} produto(s)) ===")
@@ -119,13 +234,14 @@ def run_check(
                 "Perfil Instacart vazio — autentique primeiro.\n"
                 "  python -m price_monitor auth --retailer instacart",
                 subject="Instacart: autenticação necessária",
+                email_to=notify_email,
             )
             return 2
 
-        # Walmart Affiliate API: sem browser / sem PerimeterX
+        # Walmart SerpApi: sem browser / sem PerimeterX
         can_api = getattr(adapter, "can_use_api", None)
         if callable(can_api) and can_api(rsettings):
-            print("  Modo: Affiliate API (sem browser)")
+            print("  Modo: SerpApi (sem browser)")
             print()
             for idx, product in enumerate(group, start=1):
                 print(f"[{retailer} {idx}/{len(group)}] {product.name}")
@@ -134,36 +250,29 @@ def run_check(
                     scraped = adapter.scrape_via_api(product, rsettings)
                 except Exception as exc:
                     print(f"  ERRO: {exc}")
+                    mark_checked(
+                        state,
+                        adapter.product_key(product),
+                        title=None,
+                        current_price=None,
+                        list_price=None,
+                        status="error",
+                        error=str(exc),
+                    )
+                    save_state(state_path, state)
                     exit_code = 1
                     print()
                     continue
 
-                title_preview = scraped.title or "(título não encontrado)"
-                print(f"  Título: {title_preview[:100]}")
-                if scraped.current_price is not None:
-                    print(f"  Preço atual: ${scraped.current_price:.2f}")
-                else:
-                    print("  Preço atual: não encontrado")
-                if scraped.list_price is not None:
-                    print(f"  Preço lista: ${scraped.list_price:.2f}")
-
-                alert, reason = should_alert(product, scraped)
-                if not alert:
-                    print("  Status: sem alerta")
-                    print()
-                    continue
-
-                key = adapter.product_key(product)
-                if cooldown_active(state, key, cooldown):
-                    print(f"  Status: alerta elegível, mas em cooldown ({reason})")
-                    print()
-                    continue
-
-                print(f"  Status: ALERTA — {reason}")
-                dispatch_alert(product, scraped, reason, brand=adapter.brand)
-                mark_alerted(state, key, reason, scraped.current_price)
-                save_state(state_path, state)
-                print()
+                _record_result(
+                    adapter=adapter,
+                    product=product,
+                    scraped=scraped,
+                    state=state,
+                    state_path=state_path,
+                    cooldown=cooldown,
+                    email_to=notify_email,
+                )
 
             save_state(state_path, state)
             continue
@@ -199,7 +308,9 @@ def run_check(
                         )
                     except SessionExpiredError as exc:
                         notify_message(
-                            str(exc), subject="Instacart: autenticação necessária"
+                            str(exc),
+                            subject="Instacart: autenticação necessária",
+                            email_to=notify_email,
                         )
                         return 2
                     except ChallengeRequiredError as exc:
@@ -243,39 +354,28 @@ def run_check(
                             return 1
                     except Exception as exc:
                         print(f"  ERRO ao coletar: {exc}")
+                        mark_checked(
+                            state,
+                            adapter.product_key(product),
+                            title=None,
+                            current_price=None,
+                            list_price=None,
+                            status="error",
+                            error=str(exc),
+                        )
+                        save_state(state_path, state)
                         exit_code = 1
                         continue
 
-                    title_preview = scraped.title or "(título não encontrado)"
-                    print(f"  Título: {title_preview[:100]}")
-                    if scraped.current_price is not None:
-                        print(f"  Preço atual: ${scraped.current_price:.2f}")
-                    else:
-                        print("  Preço atual: não encontrado")
-                    if scraped.list_price is not None:
-                        print(f"  Preço lista: ${scraped.list_price:.2f}")
-                    if scraped.discount_percent is not None:
-                        print(f"  Desconto: {scraped.discount_percent:.1f}%")
-
-                    alert, reason = should_alert(product, scraped)
-                    if not alert:
-                        print("  Status: sem alerta")
-                        print()
-                        continue
-
-                    key = adapter.product_key(product)
-                    if cooldown_active(state, key, cooldown):
-                        print(
-                            f"  Status: alerta elegível, mas em cooldown ({reason})"
-                        )
-                        print()
-                        continue
-
-                    print(f"  Status: ALERTA — {reason}")
-                    dispatch_alert(product, scraped, reason, brand=adapter.brand)
-                    mark_alerted(state, key, reason, scraped.current_price)
-                    save_state(state_path, state)
-                    print()
+                    _record_result(
+                        adapter=adapter,
+                        product=product,
+                        scraped=scraped,
+                        state=state,
+                        state_path=state_path,
+                        cooldown=cooldown,
+                        email_to=notify_email,
+                    )
             finally:
                 closer()
 

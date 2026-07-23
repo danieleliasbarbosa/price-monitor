@@ -11,7 +11,9 @@ DEFAULT_COOLDOWN_HOURS = 24
 KNOWN_RETAILERS = ("amazon", "safeway", "instacart", "target", "walmart")
 
 
-def load_config(config_path: Path) -> tuple[list[Product], dict[str, Any]]:
+def load_config(
+    config_path: Path, *, allow_empty: bool = False
+) -> tuple[list[Product], dict[str, Any]]:
     # Lazy import evita ciclo config <-> adapters
     from price_monitor.adapters import get_adapter
 
@@ -46,11 +48,31 @@ def load_config(config_path: Path) -> tuple[list[Product], dict[str, Any]]:
         if not isinstance(item, dict):
             raise ValueError("Cada produto deve ser um objeto JSON.")
         retailer = (item.get("retailer") or "").strip().lower()
-        if retailer not in KNOWN_RETAILERS:
-            raise ValueError(
-                f"Produto '{item.get('name')}' precisa de retailer "
-                f"em {KNOWN_RETAILERS}."
+        url = (item.get("url") or "").strip()
+        if not url:
+            raise ValueError("Cada produto precisa de 'url'.")
+        target_price = optional_float(item.get("target_price"))
+        if target_price is None:
+            label = (item.get("name") or url).strip() or url
+            raise ValueError(f"Produto '{label}' precisa de 'target_price'.")
+        if target_price <= 0:
+            raise ValueError(f"Produto '{item.get('name') or url}': target_price deve ser > 0.")
+
+        # Loja ainda não integrada (pending) — mantém na lista sem adapter.
+        if retailer not in KNOWN_RETAILERS or item.get("pending"):
+            slug = retailer or "pending"
+            name = (item.get("name") or "").strip() or slug
+            products.append(
+                Product(
+                    retailer=slug,
+                    name=name,
+                    url=url,
+                    target_price=target_price,
+                    raw=item,
+                )
             )
+            continue
+
         adapter = get_adapter(retailer)
         retailer_settings = {
             **{k: v for k, v in settings.items() if k != "retailers"},
@@ -58,7 +80,7 @@ def load_config(config_path: Path) -> tuple[list[Product], dict[str, Any]]:
         }
         products.append(adapter.normalize_product(item, retailer_settings))
 
-    if not products:
+    if not products and not allow_empty:
         raise ValueError("Nenhum produto configurado.")
 
     settings.setdefault("cooldown_hours", DEFAULT_COOLDOWN_HOURS)

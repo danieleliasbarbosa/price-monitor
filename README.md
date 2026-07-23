@@ -85,28 +85,39 @@ O sistema extrai `ASIN=B000R5NRPI`, normaliza para `https://www.amazon.com/dp/B0
 
 # Adicionar produto por URL
 .\.venv\Scripts\python.exe -m price_monitor add "URL" --target-price 5
+
+# Dashboard web local
+.\.venv\Scripts\python.exe -m price_monitor serve
+# Abra http://127.0.0.1:8765
+# Crie uma conta (login). O primeiro usuário importa o produtos.json da raiz, se existir.
+# Cada usuário fica em .data/users/<nome>/produtos.json
 ```
 
-## Walmart (Affiliate API)
+## Walmart (SerpApi)
 
-O Walmart usa PerimeterX no site; o monitor prefere a **Affiliate Marketing API**.
+O Walmart usa PerimeterX no site; o monitor prefere a **SerpApi Walmart Product API**.
 
-1. Crie app em [walmart.io](https://walmart.io) e suba a chave pública ([key tutorial](https://walmart.io/key-tutorial))
-2. Entre no Impact Radius / afiliados e pegue o `publisherId`
-3. Salve a chave privada em `.secrets/walmart_private.pem`
-4. Configure (PowerShell):
+1. Crie conta em [serpapi.com](https://serpapi.com/) e copie a API key
+2. Configure (PowerShell):
 
 ```powershell
-$env:WALMART_CONSUMER_ID = "seu-consumer-id"
-$env:WALMART_PUBLISHER_ID = "seu-impact-publisher-id"
-$env:WALMART_KEY_VERSION = "1"
-$env:WALMART_PRIVATE_KEY_PATH = "C:\Projetos\price-monitor\.secrets\walmart_private.pem"
+$env:SERPAPI_API_KEY = "sua-chave-serpapi"
 .\.venv\Scripts\python.exe -m price_monitor check --retailer walmart
 ```
 
-Ou preencha `retailers.walmart` no `produtos.json` (`consumer_id`, `publisher_id`, `private_key_path`).
+Ou preencha `retailers.walmart.serpapi_api_key` no `produtos.json`.
 
-Docs: https://walmart.io/apidocs/affiliates/affiliate-marketing-api
+Opcional (mas **recomendado**): `store_id` da sua loja — sem isso a SerpApi usa uma localização default e pode devolver preço de marketplace/sem estoque.
+
+```json
+"walmart": { "store_id": "2280", "zip": "94080" }
+```
+
+Ou via env: `SERPAPI_WALMART_STORE_ID` / `SERPAPI_WALMART_ZIP`.
+
+Lista de lojas: https://serpapi.com/walmart-stores
+
+Sem SerpApi, o fallback de browser costuma travar no PerimeterX — use só se `browser_fallback=true`.
 
 Perfis e estados (separados por loja):
 

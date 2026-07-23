@@ -83,8 +83,43 @@ class AmazonAdapter:
                 self._wait_challenge(page, headless=headless)
 
         title = self._extract_title(page)
+        if self._is_unavailable(page):
+            print("  Disponibilidade: indisponível / out of stock")
+            return ScrapedProduct(title, None, None, None)
+
         current = self._extract_current_price(page)
         return ScrapedProduct(title, current, None, None)
+
+    def _is_unavailable(self, page: Page) -> bool:
+        for sel in [
+            "#buybox",
+            "#desktop_buybox",
+            "#outOfStock",
+            "#availability",
+            "#availability_feature_div",
+        ]:
+            try:
+                loc = page.locator(sel).first
+                if loc.count() == 0:
+                    continue
+                text = (loc.inner_text(timeout=1500) or "").lower()
+            except Exception:
+                continue
+            if any(
+                p in text
+                for p in (
+                    "currently unavailable",
+                    "out of stock",
+                    "temporarily out of stock",
+                    "we don't know when or if this item will be back",
+                )
+            ):
+                return True
+        try:
+            body = (page.locator("#centerCol").inner_text(timeout=2000) or "").lower()
+        except Exception:
+            body = ""
+        return "currently unavailable" in body
 
     def run_auth(self, page: Page) -> int:
         print("Amazon não usa subcomando auth. Rode check com --no-headless se houver captcha.")
@@ -175,23 +210,61 @@ class AmazonAdapter:
 
     def _price_from_offscreen(self, scope) -> float | None:
         try:
-            off = scope.locator(".a-price .a-offscreen, span.a-offscreen").first
-            if off.count() == 0:
-                return None
-            return parse_price(off.inner_text(timeout=1500))
+            offs = scope.locator(".a-price .a-offscreen, span.a-offscreen")
+            count = offs.count()
         except Exception:
             return None
+        candidates: list[float] = []
+        for i in range(min(count, 12)):
+            try:
+                node = offs.nth(i)
+                text = node.inner_text(timeout=1000)
+                price = parse_price(text)
+                if price is None:
+                    continue
+                # Evita preço unitário ($0.01 / fl oz) e "You Save"
+                try:
+                    nearby = node.evaluate(
+                        """(el) => {
+                          const root = el.closest('#apex_desktop, #corePrice_feature_div, #centerCol, body') || el.parentElement;
+                          const block = (el.closest('.a-section, .a-price, tr, span, div') || el).parentElement;
+                          return ((block && block.innerText) || (root && root.innerText) || '').slice(0, 220).toLowerCase();
+                        }"""
+                    )
+                except Exception:
+                    nearby = ""
+                nearby = nearby or ""
+                if any(
+                    u in nearby
+                    for u in (
+                        "/ fluid ounce",
+                        "/fl oz",
+                        "per fluid ounce",
+                        "per ounce",
+                        "/ count",
+                        "unit price",
+                    )
+                ) and price < 1.0:
+                    continue
+                candidates.append(price)
+            except Exception:
+                continue
+        if not candidates:
+            return None
+        # Prefere preço de produto real (ignora centavos de unit price se houver alternativa)
+        plausible = [p for p in candidates if p >= 1.0]
+        return plausible[0] if plausible else candidates[0]
 
     def _extract_current_price(self, page: Page) -> float | None:
         for sel in [
             "#corePrice_feature_div",
             "#corePriceDisplay_desktop_feature_div",
+            "#apex_desktop_newAccordionRow",
             "#apex_desktop",
             "#price",
             "#priceblock_ourprice",
             "#priceblock_dealprice",
             ".a-price.priceToPay",
-            "#centerCol",
         ]:
             try:
                 scope = page.locator(sel).first
@@ -200,22 +273,17 @@ class AmazonAdapter:
                 price = self._price_from_offscreen(scope) or self._price_from_whole_fraction(
                     scope
                 )
-                if price is not None:
+                if price is not None and price >= 1.0:
                     return price
             except Exception:
                 continue
-        for sel in [
-            "#priceblock_ourprice",
-            "#priceblock_dealprice",
-            "span.a-price span.a-offscreen",
-        ]:
-            try:
-                loc = page.locator(sel).first
-                if loc.count() == 0:
-                    continue
-                price = parse_price(loc.inner_text(timeout=1500))
-                if price is not None:
+        # Último recurso: #centerCol, mas só preços >= $1
+        try:
+            scope = page.locator("#centerCol").first
+            if scope.count() > 0:
+                price = self._price_from_offscreen(scope)
+                if price is not None and price >= 1.0:
                     return price
-            except Exception:
-                continue
+        except Exception:
+            pass
         return None

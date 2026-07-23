@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from price_monitor.adapters import get_adapter
-from price_monitor.config import retailer_settings
-from price_monitor.urls import detect_retailer_from_url
+from price_monitor.config import KNOWN_RETAILERS, retailer_settings
+from price_monitor.urls import detect_retailer_from_url, retailer_slug_from_url
 
 
 def _load_raw(config_path: Path) -> dict[str, Any]:
@@ -52,11 +54,19 @@ def _parse_target_price(value: Any) -> float:
     return price
 
 
+def _normalize_url_key(url: str) -> str:
+    value = (url or "").strip()
+    if not value:
+        return ""
+    return value.rstrip("/").lower()
+
+
 def _entry_from_product(
     *,
     retailer: str,
     url: str,
     target_price: float,
+    name: str | None = None,
     min_discount_percent: float | None = None,
     reference_price: float | None = None,
 ) -> dict[str, Any]:
@@ -65,6 +75,8 @@ def _entry_from_product(
         "url": url,
         "target_price": target_price,
     }
+    if name:
+        entry["name"] = name
     if min_discount_percent is not None:
         entry["min_discount_percent"] = min_discount_percent
     if reference_price is not None:
@@ -77,14 +89,17 @@ def add_url_to_config(
     url: str,
     *,
     target_price: float | None = None,
+    name: str | None = None,
     min_discount_percent: float | None = None,
     reference_price: float | None = None,
     retailer: str | None = None,
 ) -> tuple[str, dict[str, Any], bool]:
     """
-    Adiciona ou atualiza um produto no JSON.
+    Adiciona um produto no JSON.
 
-    Retorna (ação, entry, created) onde ação é 'added' ou 'updated'.
+    Retorna (ação, entry, created) onde ação é 'added'.
+    Levanta ValueError se a URL/produto já existir na lista.
+    Lojas ainda não suportadas são salvas como pending (disponível em 24h).
     """
     url = (url or "").strip()
     if not url:
@@ -92,17 +107,9 @@ def add_url_to_config(
     if not url.lower().startswith(("http://", "https://")):
         url = "https://" + url
 
-    detected = detect_retailer_from_url(url)
-    retailer = (retailer or detected or "").strip().lower()
-    if not retailer:
-        raise ValueError(
-            f"Não foi possível detectar o varejista da URL:\n  {url}\n"
-            "Use --retailer amazon|safeway|instacart|target"
-        )
-    if detected and retailer != detected:
-        raise ValueError(
-            f"URL parece ser de '{detected}', mas --retailer={retailer} foi informado."
-        )
+    name_value = re.sub(r"\s+", " ", (name or "").strip())
+    if len(name_value) > 200:
+        raise ValueError("Nome do produto muito longo (máx. 200 caracteres).")
 
     if target_price is None:
         raise ValueError(
@@ -110,14 +117,57 @@ def add_url_to_config(
         )
     target_price = _parse_target_price(target_price)
 
-    adapter = get_adapter(retailer)
+    detected = detect_retailer_from_url(url)
+    retailer = (retailer or detected or "").strip().lower()
+    if detected and retailer and retailer != detected:
+        raise ValueError(
+            f"URL parece ser de '{detected}', mas --retailer={retailer} foi informado."
+        )
+
     raw = _load_raw(config_path)
+    products: list[Any] = raw["products"]
+    incoming_urls = {_normalize_url_key(url)}
+
+    # Loja ainda não integrada: salva como pendente.
+    if not retailer or retailer not in KNOWN_RETAILERS:
+        slug = retailer or retailer_slug_from_url(url)
+        if not slug:
+            raise ValueError(
+                "Não foi possível identificar a loja pela URL. "
+                "Use uma URL válida (ex.: amazon.com, walmart.com)."
+            )
+        for existing in products:
+            if not isinstance(existing, dict):
+                continue
+            existing_url = _normalize_url_key(str(existing.get("url") or ""))
+            if existing_url and existing_url in incoming_urls:
+                raise ValueError("Essa URL já está na sua lista de produtos.")
+        available_after = (
+            datetime.now(timezone.utc) + timedelta(hours=24)
+        ).isoformat()
+        entry: dict[str, Any] = {
+            "retailer": slug,
+            "url": url,
+            "target_price": target_price,
+            "pending": True,
+            "available_after": available_after,
+        }
+        if name_value:
+            entry["name"] = name_value
+        else:
+            entry["name"] = slug
+        products.append(entry)
+        _save_raw(config_path, raw)
+        return "added", entry, True
+
+    adapter = get_adapter(retailer)
     settings = retailer_settings(raw, retailer)
 
     draft = _entry_from_product(
         retailer=retailer,
         url=url,
         target_price=target_price,
+        name=name_value or None,
         min_discount_percent=min_discount_percent,
         reference_price=reference_price,
     )
@@ -126,38 +176,18 @@ def add_url_to_config(
         retailer=retailer,
         url=product.url,
         target_price=product.target_price,
+        name=name_value or None,
         min_discount_percent=product.min_discount_percent,
         reference_price=product.reference_price,
     )
-    new_key = adapter.product_key(product)
+    incoming_urls.add(_normalize_url_key(product.url))
 
-    products: list[Any] = raw["products"]
-    for i, existing in enumerate(products):
+    for existing in products:
         if not isinstance(existing, dict):
             continue
-        existing_retailer = (existing.get("retailer") or "").strip().lower()
-        if existing_retailer != retailer:
-            continue
-        try:
-            existing_product = adapter.normalize_product(
-                {**existing, "target_price": existing.get("target_price", target_price)},
-                settings,
-            )
-        except Exception:
-            continue
-        if adapter.product_key(existing_product) != new_key:
-            continue
-        updated = dict(existing)
-        updated["url"] = entry["url"]
-        updated["retailer"] = retailer
-        updated["target_price"] = target_price
-        if min_discount_percent is not None:
-            updated["min_discount_percent"] = min_discount_percent
-        if reference_price is not None:
-            updated["reference_price"] = reference_price
-        products[i] = updated
-        _save_raw(config_path, raw)
-        return "updated", updated, False
+        existing_url = _normalize_url_key(str(existing.get("url") or ""))
+        if existing_url and existing_url in incoming_urls:
+            raise ValueError("Essa URL já está na sua lista de produtos.")
 
     products.append(entry)
     _save_raw(config_path, raw)
@@ -218,9 +248,8 @@ def prompt_add_interactive(
             print(f"  Erro: {exc}")
             continue
 
-        label = "Adicionado" if action == "added" else "Atualizado"
         print(
-            f"  {label}: {entry['retailer']} | {entry['url']} | "
+            f"  Adicionado: {entry['retailer']} | {entry['url']} | "
             f"${entry['target_price']:.2f}"
         )
         added += 1

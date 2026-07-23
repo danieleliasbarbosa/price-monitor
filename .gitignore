@@ -19,6 +19,7 @@ produtos.json
 
 .profiles/
 .state/
+.data/
 
 .idea/
 .vscode/

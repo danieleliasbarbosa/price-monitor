@@ -19,6 +19,7 @@ from price_monitor.urls import (
 )
 
 PAGE_SETTLE_MS = 3_000
+PRICE_WAIT_MS = 25_000
 
 
 class TargetAdapter:
@@ -86,23 +87,67 @@ class TargetAdapter:
         headless: bool,
         set_location: bool = False,
     ) -> ScrapedProduct:
-        page.goto(product.url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+        # networkidle ajuda o deferred enrichment (preço) a chegar.
+        try:
+            page.goto(product.url, wait_until="networkidle", timeout=NAV_TIMEOUT_MS)
+        except Exception:
+            page.goto(product.url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         page.wait_for_timeout(PAGE_SETTLE_MS)
 
         if self._looks_like_challenge(page):
             self._wait_challenge(page, headless=headless)
-            page.goto(product.url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+            try:
+                page.goto(product.url, wait_until="networkidle", timeout=NAV_TIMEOUT_MS)
+            except Exception:
+                page.goto(
+                    product.url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS
+                )
             page.wait_for_timeout(PAGE_SETTLE_MS)
             if self._looks_like_challenge(page):
                 self._wait_challenge(page, headless=headless)
 
+        # Target não SSR o preço; hidrata depois (deferred enrichment).
+        self._wait_for_price(page)
+
         title_ld, price_ld, list_ld = self._from_json_ld(page)
         title = self._extract_title(page) or title_ld
-        current = self._extract_current_price(page) or price_ld
+        current = (
+            self._extract_current_price(page)
+            or self._price_from_next_data(page, product)
+            or price_ld
+        )
         list_price = self._extract_list_price(page) or list_ld
         if list_price is not None and current is not None and abs(list_price - current) < 0.001:
             list_price = None
         return ScrapedProduct(title, current, list_price, None)
+
+    def _wait_for_price(self, page: Page) -> None:
+        deadline = time.monotonic() + (PRICE_WAIT_MS / 1000)
+        selectors = [
+            '[data-test="product-price"]',
+            '[data-test="current-price"]',
+        ]
+        while time.monotonic() < deadline:
+            for sel in selectors:
+                try:
+                    text = page.evaluate(
+                        """(sel) => {
+                          const el = document.querySelector(sel);
+                          return el ? (el.textContent || '').trim() : '';
+                        }""",
+                        sel,
+                    )
+                    if text and parse_price(str(text), max_value=10_000) is not None:
+                        return
+                except Exception:
+                    continue
+            try:
+                main = page.locator("main").inner_text(timeout=800)
+            except Exception:
+                main = ""
+            if re.search(r"\$\s*\d+\.\d{2}", main or ""):
+                return
+            page.wait_for_timeout(500)
 
     def run_auth(self, page: Page) -> int:
         print("Target não usa subcomando auth. Use check --no-headless se houver challenge.")
@@ -217,7 +262,18 @@ class TargetAdapter:
                 loc = page.locator(sel).first
                 if loc.count() == 0:
                     continue
-                price = parse_price(loc.inner_text(timeout=1500), max_value=10_000)
+                # textContent pega o valor mesmo se ainda estiver condensando layout
+                try:
+                    text = page.evaluate(
+                        """(sel) => {
+                          const el = document.querySelector(sel);
+                          return el ? (el.textContent || '') : '';
+                        }""",
+                        sel,
+                    )
+                except Exception:
+                    text = loc.inner_text(timeout=1500)
+                price = parse_price(text, max_value=10_000)
                 if price is not None:
                     return price
             except Exception:
@@ -231,6 +287,47 @@ class TargetAdapter:
                 body = ""
         m = re.search(r"\$\s*(\d+\.\d{2})", body)
         return parse_price(m.group(1), max_value=10_000) if m else None
+
+    def _price_from_next_data(self, page: Page, product: Product) -> float | None:
+        """Fallback: procura preço em blobs JSON da página / enrichment."""
+        blobs: list[str] = []
+        try:
+            raw = page.locator("script#__NEXT_DATA__").first.inner_text(timeout=1500)
+            blobs.append(raw)
+        except Exception:
+            pass
+        try:
+            blobs.append(page.content())
+        except Exception:
+            return None
+
+        tcins = []
+        preselect = (product.raw or {}).get("_preselect")
+        if preselect:
+            tcins.append(str(preselect))
+        if product.product_id:
+            tcins.append(str(product.product_id))
+
+        patterns = [
+            r'"current_retail"\s*:\s*(\d+(?:\.\d+)?)',
+            r'"formatted_current_price"\s*:\s*"\$?(\d+(?:\.\d+)?)"',
+            r'"reg_retail"\s*:\s*(\d+(?:\.\d+)?)',
+            r'"price"\s*:\s*(\d+\.\d{2})',
+        ]
+        for blob in blobs:
+            windows = [blob]
+            for tcin in tcins:
+                for m in re.finditer(re.escape(tcin), blob):
+                    windows.append(blob[max(0, m.start() - 300) : m.end() + 800])
+            for window in windows:
+                for pat in patterns:
+                    pm = re.search(pat, window)
+                    if not pm:
+                        continue
+                    price = parse_price(pm.group(1), max_value=10_000)
+                    if price is not None:
+                        return price
+        return None
 
     def _extract_list_price(self, page: Page) -> float | None:
         for sel in [

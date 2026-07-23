@@ -24,7 +24,7 @@ Não usar APIs pagas (Keepa etc.). Scraping via navegador real.
 1. **amazon-price-monitor** — primeiro monitor (Amazon EUA)
 2. **safeway-price-monitor** — espelho para Safeway
 3. **instacart-price-monitor** — Instacart com login OTP/SMS (`auth`)
-4. **price-monitor** — unificação dos três + Target + CLI `add` de URLs
+4. **price-monitor** — unificação dos três + Target + Walmart (SerpApi) + CLI `add` de URLs
 
 Os projetos antigos podem ficar no disco; o uso diário é só `price-monitor`.
 
@@ -59,12 +59,14 @@ price-monitor/
     runner.py
     urls.py
     add_product.py
+    walmart_api.py
     adapters/
       base.py
       amazon.py
       safeway.py
       instacart.py
       target.py
+      walmart.py
       __init__.py
 ```
 
@@ -80,7 +82,8 @@ price-monitor/
     "amazon": { "headless": true },
     "safeway": { "zip": "94080" },
     "instacart": { "zip": "94080", "retailer_slug": "safeway" },
-    "target": { "headless": true }
+    "target": { "headless": true },
+    "walmart": { "headless": true }
   },
   "products": [
     {
@@ -136,6 +139,14 @@ Regras por produto:
 - Canônica: `/p/{slug}/-/A-{tcin}?preselect=...`
 - Adapter no mesmo padrão dos outros
 
+### Walmart
+- Extrair `product_id` da URL `/ip/.../{id}`
+- Preferir **SerpApi** (`engine=walmart_product`) — evita PerimeterX
+- Env: `SERPAPI_API_KEY` (ou `retailers.walmart.serpapi_api_key`)
+- Opcional: `store_id` / `SERPAPI_WALMART_STORE_ID` para preço por loja
+- Preço: `product_result.price_map.price` (+ `was_price` como lista)
+- Browser só com `browser_fallback=true` (PerimeterX costuma bloquear)
+
 ---
 
 ## CLI
@@ -145,7 +156,14 @@ python -m price_monitor check [--config] [--retailer] [--headless|--no-headless]
 python -m price_monitor auth --retailer instacart
 python -m price_monitor warm --retailer safeway
 python -m price_monitor add [URL ...] --target-price N [--min-discount-percent] [--reference-price] [--retailer] [--config]
+python -m price_monitor serve [--host] [--port]
 ```
+
+### `serve`
+- Dashboard local em `http://127.0.0.1:8765`
+- Lista produtos + último preço (`.state/*/last_checks`)
+- Botão para rodar `check` (com log)
+- Formulário para adicionar URL
 
 ### `add`
 - Sem URLs → modo interativo (cola URL + preço alvo até Enter vazio)

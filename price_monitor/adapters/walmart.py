@@ -19,6 +19,7 @@ from price_monitor.urls import (
 from price_monitor.walmart_api import (
     WalmartApiError,
     api_configured,
+    describe_offer_context,
     fetch_item,
     parse_item_price,
 )
@@ -91,11 +92,19 @@ class WalmartAdapter:
     ) -> ScrapedProduct:
         if not product.product_id:
             raise WalmartApiError("Produto Walmart sem product_id.")
-        print("  Fonte: Affiliate API (walmart.io)")
+        print("  Fonte: SerpApi (walmart_product)")
         item = fetch_item(product.product_id, settings)
+        ctx = describe_offer_context(item)
+        if ctx:
+            print(f"  Contexto: {ctx}")
         title, current, list_price = parse_item_price(item)
         if not title:
             title = product.name
+        if item.get("in_stock") is False:
+            print(
+                "  Aviso: SerpApi marca sem estoque nesta loja — "
+                "preço pode ser de marketplace. Ajuste store_id/zip."
+            )
         return ScrapedProduct(title, current, list_price, None)
 
     def scrape(
@@ -116,11 +125,11 @@ class WalmartAdapter:
                 if not allow_browser:
                     raise ChallengeRequiredError(
                         f"{exc}\n"
-                        "Configure a Affiliate API ou ative "
+                        "Configure SERPAPI_API_KEY ou ative "
                         "retailers.walmart.browser_fallback=true "
                         "(PerimeterX costuma bloquear)."
                     ) from exc
-                print(f"  API falhou ({exc}); tentando browser...")
+                print(f"  SerpApi falhou ({exc}); tentando browser...")
 
         self._open_product(page, product.url, headless=headless)
         title_ld, price_ld, list_ld = self._from_json_ld(page)
@@ -191,7 +200,7 @@ class WalmartAdapter:
         product_url: str | None = None,
     ) -> bool:
         if self.can_use_api(settings):
-            print("  Walmart está em modo Affiliate API — warm de browser não é necessário.")
+            print("  Walmart está em modo SerpApi — warm de browser não é necessário.")
             try:
                 # Smoke test da API com o product_id da URL se possível
                 from price_monitor.urls import walmart_product_id_from_url
@@ -200,18 +209,18 @@ class WalmartAdapter:
                 if pid:
                     item = fetch_item(pid, settings)
                     title, price, _ = parse_item_price(item)
-                    print(f"  API OK: {title or pid} | ${price}")
+                    print(f"  SerpApi OK: {title or pid} | ${price}")
                 else:
-                    print("  Credenciais presentes (sem product_id para testar).")
+                    print("  SERPAPI_API_KEY presente (sem product_id para testar).")
                 return True
             except WalmartApiError as exc:
-                print(f"  API falhou: {exc}")
+                print(f"  SerpApi falhou: {exc}")
                 return False
 
         url = (product_url or "").strip() or WARM_URL
         print(f"  Warm Walmart (browser): {url}")
         print("=" * 60)
-        print("  Preferível: configure a Affiliate API (sem Press & Hold).")
+        print("  Preferível: configure SERPAPI_API_KEY (sem Press & Hold).")
         print("  Enquanto isso: se aparecer Press & Hold, SEGURE na janela.")
         print("=" * 60)
         page.goto(WARM_URL, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
@@ -254,11 +263,9 @@ class WalmartAdapter:
 
     def run_auth(self, page: Page) -> int:
         print(
-            "Walmart Affiliate API — configure:\n"
-            "  WALMART_CONSUMER_ID\n"
-            "  WALMART_PRIVATE_KEY_PATH\n"
-            "  WALMART_PUBLISHER_ID\n"
-            "Docs: https://walmart.io/apidocs/affiliates/affiliate-marketing-api"
+            "Walmart via SerpApi — configure:\n"
+            "  SERPAPI_API_KEY\n"
+            "Docs: https://serpapi.com/walmart-product-api"
         )
         return 1
 
@@ -266,8 +273,8 @@ class WalmartAdapter:
         if headless:
             raise ChallengeRequiredError(
                 "Walmart bloqueou no browser.\n"
-                "Use a Affiliate API (recomendado):\n"
-                "  WALMART_CONSUMER_ID / WALMART_PRIVATE_KEY_PATH / WALMART_PUBLISHER_ID\n"
+                "Use SerpApi (recomendado):\n"
+                "  SERPAPI_API_KEY\n"
                 "Ou: python -m price_monitor warm --retailer walmart --reset-profile"
             )
         print("  Press & Hold na janela — aguardando (sem Enter)...")

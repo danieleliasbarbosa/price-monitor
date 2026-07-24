@@ -10,7 +10,11 @@ from typing import Any
 
 from price_monitor.adapters import get_adapter
 from price_monitor.config import KNOWN_RETAILERS, retailer_settings
-from price_monitor.urls import detect_retailer_from_url, retailer_slug_from_url
+from price_monitor.urls import (
+    detect_retailer_from_url,
+    retailer_slug_from_url,
+    validate_known_store_product_url,
+)
 
 
 def _load_raw(config_path: Path) -> dict[str, Any]:
@@ -197,6 +201,10 @@ def add_url_to_config(
         raise ValueError(
             f"URL looks like '{detected}', but --retailer={retailer} was provided."
         )
+
+    # Known stores: reject homepage / search / malformed links before saving.
+    if retailer in KNOWN_RETAILERS or detected in KNOWN_RETAILERS:
+        retailer = validate_known_store_product_url(url, retailer or detected)
 
     raw = _load_raw(config_path)
     products: list[Any] = raw["products"]

@@ -217,3 +217,70 @@ def walmart_canonical_url(product_id: str, original: str | None = None) -> str:
             slug = m.group(1).strip()
     path = f"/ip/{slug}/{product_id}" if slug else f"/ip/{product_id}"
     return urlunparse(("https", host, path, "", "", ""))
+
+
+def validate_known_store_product_url(url: str, retailer: str | None = None) -> str:
+    """
+    Validates that URL is a usable product page for a supported store.
+    Returns the retailer slug. Raises ValueError with a clear message if invalid.
+    """
+    value = (url or "").strip()
+    if not value:
+        raise ValueError("Enter a product URL.")
+    if not value.lower().startswith(("http://", "https://")):
+        value = "https://" + value
+
+    parsed = urlparse(value)
+    if not parsed.netloc or "." not in parsed.netloc:
+        raise ValueError(
+            "Invalid URL. Use a full product link "
+            "(e.g. https://www.amazon.com/dp/B000R5NRPI)."
+        )
+
+    detected = detect_retailer_from_url(value)
+    retailer = (retailer or detected or "").strip().lower()
+    if detected and retailer and retailer != detected:
+        raise ValueError(
+            f"URL looks like '{detected}', but retailer '{retailer}' was provided."
+        )
+    if not retailer or retailer not in {
+        "amazon",
+        "safeway",
+        "instacart",
+        "target",
+        "walmart",
+    }:
+        # Unknown store — caller may treat as pending.
+        return retailer
+
+    if retailer == "amazon":
+        if not amazon_asin_from_url(value):
+            raise ValueError(
+                "Invalid Amazon URL. Use a product page with /dp/ASIN "
+                "(e.g. https://www.amazon.com/dp/B000R5NRPI)."
+            )
+    elif retailer == "safeway":
+        if not safeway_product_id_from_url(value):
+            raise ValueError(
+                "Invalid Safeway URL. Use a product page like "
+                "https://www.safeway.com/shop/product-details.123456.html."
+            )
+    elif retailer == "instacart":
+        if not instacart_product_id_from_url(value):
+            raise ValueError(
+                "Invalid Instacart URL. Use a product page with /products/ID "
+                "(e.g. https://www.instacart.com/products/12345)."
+            )
+    elif retailer == "target":
+        if not target_tcin_from_url(value):
+            raise ValueError(
+                "Invalid Target URL. Use a product page with /-/A-TCIN "
+                "(e.g. https://www.target.com/p/-/A-84793249)."
+            )
+    elif retailer == "walmart":
+        if not walmart_product_id_from_url(value):
+            raise ValueError(
+                "Invalid Walmart URL. Use a product page with /ip/.../ID "
+                "(e.g. https://www.walmart.com/ip/43240608)."
+            )
+    return retailer

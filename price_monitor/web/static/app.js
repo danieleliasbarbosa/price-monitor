@@ -30,6 +30,7 @@ const els = {
   list: document.getElementById("productList"),
   empty: document.getElementById("emptyState"),
   boardMeta: document.getElementById("boardMeta"),
+  productSort: document.getElementById("productSort"),
   summary: document.getElementById("summary"),
   summaryPills: document.getElementById("summaryPills"),
   retailerFilter: document.getElementById("retailerFilter"),
@@ -86,6 +87,8 @@ let currentProfilePhone = "";
 const REMEMBER_USER_KEY = "pm_remember_username";
 const REMEMBER_FLAG_KEY = "pm_remember_username_enabled";
 const HIDE_ACCOUNT_KEY = "pm_hide_account";
+const SORT_STORAGE_KEY = "pm_product_sort";
+const DEFAULT_SORT = "added_desc";
 
 function normalizeUrlKey(url) {
   return String(url || "")
@@ -828,17 +831,96 @@ if (els.contactForm) {
   });
 }
 
+function getProductSort() {
+  const saved = (localStorage.getItem(SORT_STORAGE_KEY) || "").trim();
+  if (saved && els.productSort?.querySelector(`option[value="${saved}"]`)) {
+    return saved;
+  }
+  return DEFAULT_SORT;
+}
+
+function setProductSort(value) {
+  const next = value || DEFAULT_SORT;
+  localStorage.setItem(SORT_STORAGE_KEY, next);
+  if (els.productSort) els.productSort.value = next;
+}
+
+function productAlertStatus(product) {
+  if (product.pending) return "new store · available in 24h";
+  return statusLabel(product.last_check).text || "—";
+}
+
+function productSortValue(product, mode) {
+  if (mode.startsWith("name_")) {
+    return String(product.name || "").trim().toLowerCase();
+  }
+  if (mode.startsWith("store_")) {
+    return String(product.brand || product.retailer || "")
+      .trim()
+      .toLowerCase();
+  }
+  if (mode.startsWith("price_")) {
+    const current = product.last_check?.current_price;
+    if (current != null && Number.isFinite(Number(current))) return Number(current);
+    return null;
+  }
+  if (mode.startsWith("delta_")) {
+    if (product.delta_to_target == null || !Number.isFinite(Number(product.delta_to_target))) {
+      return null;
+    }
+    return Math.abs(Number(product.delta_to_target));
+  }
+  if (mode.startsWith("status_")) {
+    return productAlertStatus(product).toLowerCase();
+  }
+  // added_*
+  return String(product.added_at || "");
+}
+
+function sortProducts(products, mode) {
+  const list = Array.isArray(products) ? products.slice() : [];
+  const desc = mode.endsWith("_desc");
+  list.sort((a, b) => {
+    const av = productSortValue(a, mode);
+    const bv = productSortValue(b, mode);
+    const aMissing = av == null || av === "";
+    const bMissing = bv == null || bv === "";
+    if (aMissing && bMissing) {
+      return (Number(a.index) || 0) - (Number(b.index) || 0);
+    }
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+    let cmp = 0;
+    if (typeof av === "number" && typeof bv === "number") {
+      cmp = av - bv;
+    } else {
+      cmp = String(av).localeCompare(String(bv), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    }
+    if (cmp === 0) {
+      cmp = (Number(a.index) || 0) - (Number(b.index) || 0);
+    }
+    return desc ? -cmp : cmp;
+  });
+  return list;
+}
+
 function renderProducts(products) {
   currentProducts = Array.isArray(products) ? products : [];
+  const sortMode = getProductSort();
+  if (els.productSort) els.productSort.value = sortMode;
+  const sorted = sortProducts(currentProducts, sortMode);
   els.list.innerHTML = "";
-  els.empty.hidden = currentProducts.length > 0;
-  els.boardMeta.textContent = `${currentProducts.length} item(s)`;
+  els.empty.hidden = sorted.length > 0;
+  els.boardMeta.textContent = `${sorted.length} item(s)`;
 
   let below = 0;
   let known = 0;
   let unavailable = 0;
 
-  currentProducts.forEach((p, index) => {
+  sorted.forEach((p) => {
     const last = p.last_check;
     if (last?.current_price != null) known += 1;
     if (p.below_target) below += 1;
@@ -847,6 +929,7 @@ function renderProducts(products) {
     const st = p.pending
       ? { text: "new store · available in 24h", cls: "cooldown" }
       : statusLabel(last);
+    const removeIndex = Number.isInteger(p.index) ? p.index : -1;
     const row = document.createElement("article");
     row.className = "product";
     row.innerHTML = `
@@ -869,7 +952,7 @@ function renderProducts(products) {
       </div>
       <div class="status ${st.cls}">
         ${st.text}
-        <div><button type="button" class="btn ghost" data-remove="${index}">remove</button></div>
+        <div><button type="button" class="btn ghost" data-remove="${removeIndex}">remove</button></div>
       </div>
     `;
     els.list.appendChild(row);
@@ -878,7 +961,7 @@ function renderProducts(products) {
   els.summary.hidden = false;
   const pills = els.summaryPills || els.summary;
   pills.innerHTML = `
-    <div class="pill"><strong>${currentProducts.length}</strong> products</div>
+    <div class="pill"><strong>${sorted.length}</strong> products</div>
     <div class="pill"><strong>${known}</strong> with price</div>
     <div class="pill"><strong>${below}</strong> at or below target</div>
     <div class="pill"><strong>${unavailable}</strong> unavailable</div>
@@ -887,7 +970,7 @@ function renderProducts(products) {
   els.list.querySelectorAll("[data-remove]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.getAttribute("data-remove"));
-      if (!Number.isInteger(idx)) return;
+      if (!Number.isInteger(idx) || idx < 0) return;
       if (!confirm("Remove this product from your list?")) return;
       try {
         await api(`/api/products/${idx}`, { method: "DELETE" });
@@ -1193,6 +1276,14 @@ els.passwordForm.addEventListener("submit", async (event) => {
     els.passwordMsg.textContent = err.message;
   }
 });
+
+if (els.productSort) {
+  els.productSort.value = getProductSort();
+  els.productSort.addEventListener("change", () => {
+    setProductSort(els.productSort.value);
+    renderProducts(currentProducts);
+  });
+}
 
 els.btnCheck.addEventListener("click", async () => {
   if (!checkAllowed || els.btnCheck.disabled) return;

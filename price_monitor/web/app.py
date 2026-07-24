@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 
 from price_monitor.adapters import get_adapter, list_retailers
-from price_monitor.add_product import add_url_to_config
+from price_monitor.add_product import add_url_to_config, ensure_config_added_at
 from price_monitor.config import load_config, resolve_cooldown
 from price_monitor.envfile import load_dotenv
 from price_monitor.runner import run_check
@@ -149,7 +149,9 @@ def _config_for(username: str) -> Path:
     return user_config_path(_data_dir(), username)
 
 
-def _product_payload(product, adapter, state: dict[str, Any]) -> dict[str, Any]:
+def _product_payload(
+    product, adapter, state: dict[str, Any], *, index: int
+) -> dict[str, Any]:
     key = adapter.product_key(product)
     last = (state.get("last_checks") or {}).get(key) or {}
     alert = (state.get("alerts") or {}).get(key) or {}
@@ -158,7 +160,9 @@ def _product_payload(product, adapter, state: dict[str, Any]) -> dict[str, Any]:
     delta = None
     if current is not None and target is not None:
         delta = round(float(current) - float(target), 2)
+    raw = product.raw if isinstance(product.raw, dict) else {}
     return {
+        "index": index,
         "retailer": product.retailer,
         "brand": adapter.brand,
         "name": product.name,
@@ -169,6 +173,7 @@ def _product_payload(product, adapter, state: dict[str, Any]) -> dict[str, Any]:
         "asin": product.asin,
         "pending": False,
         "available_after": None,
+        "added_at": raw.get("added_at"),
         "last_check": last or None,
         "last_alert": alert or None,
         "delta_to_target": delta,
@@ -178,9 +183,10 @@ def _product_payload(product, adapter, state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _pending_product_payload(product) -> dict[str, Any]:
+def _pending_product_payload(product, *, index: int) -> dict[str, Any]:
     raw = product.raw if isinstance(product.raw, dict) else {}
     return {
+        "index": index,
         "retailer": product.retailer,
         "brand": product.retailer,
         "name": product.name,
@@ -191,6 +197,7 @@ def _pending_product_payload(product) -> dict[str, Any]:
         "asin": None,
         "pending": True,
         "available_after": raw.get("available_after"),
+        "added_at": raw.get("added_at"),
         "last_check": None,
         "last_alert": None,
         "delta_to_target": None,
@@ -515,17 +522,22 @@ def create_app() -> FastAPI:
         if not path.exists():
             return {"products": [], "count": 0}
 
+        try:
+            ensure_config_added_at(path)
+        except Exception:
+            pass
+
         products, _settings = load_config(path, allow_empty=True)
         state_root = user_state_dir(_data_dir(), username)
         known = set(list_retailers())
         items: list[dict[str, Any]] = []
-        for product in products:
+        for index, product in enumerate(products):
             if product.retailer not in known or (product.raw or {}).get("pending"):
-                items.append(_pending_product_payload(product))
+                items.append(_pending_product_payload(product, index=index))
                 continue
             adapter = get_adapter(product.retailer)
             state = load_state((state_root / f"{product.retailer}.json").resolve())
-            items.append(_product_payload(product, adapter, state))
+            items.append(_product_payload(product, adapter, state, index=index))
         return {"products": items, "count": len(items)}
 
     @app.post("/api/products")

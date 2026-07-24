@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=25" />
+  <link rel="stylesheet" href="/static/styles.css?v=26" />
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
@@ -189,31 +189,6 @@
         </div>
       </section>
 
-      <section class="summary" id="summary" hidden aria-label="Summary">
-        <div id="summaryPills" class="summary-pills"></div>
-        <div class="summary-controls">
-          <div class="check-action">
-            <button type="button" id="btnCheck" class="btn primary">Check prices</button>
-            <p id="checkCooldownHint" class="check-cooldown-hint" hidden></p>
-          </div>
-          <label class="field compact summary-store">
-            <span>Store</span>
-            <select id="retailerFilter">
-              <option value="">all</option>
-            </select>
-          </label>
-        </div>
-      </section>
-
-      <section class="board" aria-labelledby="board-title">
-        <div class="section-head">
-          <h2 id="board-title">Products</h2>
-          <p id="boardMeta" class="muted"></p>
-        </div>
-        <div id="productList" class="product-list"></div>
-        <p id="emptyState" class="empty" hidden>No products in your list. Add a URL below.</p>
-      </section>
-
       <section class="compose" aria-labelledby="add-title">
         <div class="section-head">
           <h2 id="add-title">Add URL</h2>
@@ -243,9 +218,53 @@
           <p class="check-progress-label">Running…</p>
         </div>
       </section>
+
+      <section class="summary" id="summary" hidden aria-label="Summary">
+        <div id="summaryPills" class="summary-pills"></div>
+        <div class="summary-controls">
+          <div class="check-action">
+            <button type="button" id="btnCheck" class="btn primary">Check prices</button>
+            <p id="checkCooldownHint" class="check-cooldown-hint" hidden></p>
+          </div>
+          <label class="field compact summary-store">
+            <span>Store</span>
+            <select id="retailerFilter">
+              <option value="">all</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="board" aria-labelledby="board-title">
+        <div class="section-head board-head">
+          <div>
+            <h2 id="board-title">Products</h2>
+            <p id="boardMeta" class="muted"></p>
+          </div>
+          <label class="field compact sort-field">
+            <span>Sort</span>
+            <select id="productSort">
+              <option value="added_desc">Added (newest first)</option>
+              <option value="added_asc">Added (oldest first)</option>
+              <option value="name_asc">Name (A–Z)</option>
+              <option value="name_desc">Name (Z–A)</option>
+              <option value="price_asc">Price (low to high)</option>
+              <option value="price_desc">Price (high to low)</option>
+              <option value="store_asc">Store (A–Z)</option>
+              <option value="store_desc">Store (Z–A)</option>
+              <option value="delta_asc">Distance to target (low to high)</option>
+              <option value="delta_desc">Distance to target (high to low)</option>
+              <option value="status_asc">Alert status (A–Z)</option>
+              <option value="status_desc">Alert status (Z–A)</option>
+            </select>
+          </label>
+        </div>
+        <div id="productList" class="product-list"></div>
+        <p id="emptyState" class="empty" hidden>No products in your list. Add a URL above.</p>
+      </section>
     </main>
   </div>
 
-  <script src="/static/app.js?v=47"></script>
+  <script src="/static/app.js?v=51"></script>
 </body>
 </html>

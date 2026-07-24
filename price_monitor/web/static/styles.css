@@ -201,6 +201,15 @@ main {
   margin-bottom: 1rem;
 }
 
+.board-head {
+  align-items: end;
+}
+
+.sort-field {
+  flex: 0 0 auto;
+  min-width: 14rem;
+}
+
 .account-head {
   align-items: center;
 }

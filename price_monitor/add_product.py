@@ -37,9 +37,83 @@ def _load_raw(config_path: Path) -> dict[str, Any]:
 
 def _save_raw(config_path: Path, raw: dict[str, Any]) -> None:
     config_path.parent.mkdir(parents=True, exist_ok=True)
+    # Keep a single products list so loaders never read a stale "produtos" key.
+    products = raw.get("products")
+    if not isinstance(products, list):
+        products = raw.get("produtos") if isinstance(raw.get("produtos"), list) else []
+        raw["products"] = products
+    raw.pop("produtos", None)
     with config_path.open("w", encoding="utf-8", newline="\n") as fh:
         json.dump(raw, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def ensure_added_at(raw: dict[str, Any]) -> bool:
+    """
+    Backfill missing added_at so sort-by-added works.
+    File order is newest → oldest (new products are prepended).
+    Returns True if the config was modified.
+    """
+    products = raw.get("products")
+    if not isinstance(products, list):
+        return False
+    n = len(products)
+    base = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    stamped: list[tuple[int, dict[str, Any], str]] = []
+    for i, item in enumerate(products):
+        if not isinstance(item, dict):
+            continue
+        at = str(item.get("added_at") or "").strip()
+        stamped.append((i, item, at))
+    if not stamped:
+        return False
+
+    has_real = any(
+        at and not at.startswith("2020-01-01T") for _, _, at in stamped
+    )
+    changed = False
+    if not has_real:
+        # Pure synthetic/missing list: align stamps to current file order.
+        for i, item, at in stamped:
+            new_at = (base + timedelta(seconds=(n - 1 - i))).isoformat()
+            if at != new_at:
+                item["added_at"] = new_at
+                changed = True
+        return changed
+
+    for i, item, at in stamped:
+        if at:
+            continue
+        item["added_at"] = (base + timedelta(seconds=(n - 1 - i))).isoformat()
+        changed = True
+    return changed
+
+
+def ensure_config_added_at(config_path: Path) -> bool:
+    """Load config, backfill added_at if needed, and persist. Returns True if saved."""
+    if not config_path.exists():
+        return False
+    raw = _load_raw(config_path)
+    if not ensure_added_at(raw):
+        return False
+    _save_raw(config_path, raw)
+    return True
+
+
+def _prepend_product(raw: dict[str, Any], entry: dict[str, Any]) -> None:
+    """Always put newly added products at the top of the list."""
+    existing = raw.get("products")
+    if not isinstance(existing, list):
+        existing = []
+    if not str(entry.get("added_at") or "").strip():
+        entry["added_at"] = _now_iso()
+    ensure_added_at(raw)
+    existing = raw.get("products") if isinstance(raw.get("products"), list) else existing
+    raw["products"] = [entry, *existing]
 
 
 def _parse_target_price(value: Any) -> float:
@@ -151,12 +225,13 @@ def add_url_to_config(
             "target_price": target_price,
             "pending": True,
             "available_after": available_after,
+            "added_at": _now_iso(),
         }
         if name_value:
             entry["name"] = name_value
         else:
             entry["name"] = slug
-        products.append(entry)
+        _prepend_product(raw, entry)
         _save_raw(config_path, raw)
         return "added", entry, True
 
@@ -180,6 +255,7 @@ def add_url_to_config(
         min_discount_percent=product.min_discount_percent,
         reference_price=product.reference_price,
     )
+    entry["added_at"] = _now_iso()
     incoming_urls.add(_normalize_url_key(product.url))
 
     for existing in products:
@@ -189,7 +265,7 @@ def add_url_to_config(
         if existing_url and existing_url in incoming_urls:
             raise ValueError("That URL is already in your product list.")
 
-    products.append(entry)
+    _prepend_product(raw, entry)
     _save_raw(config_path, raw)
     return "added", entry, True
 

@@ -100,6 +100,12 @@ body {
   display: grid;
   gap: 0.35rem;
   justify-items: start;
+  min-width: 12rem;
+}
+
+.check-action .check-progress {
+  width: 100%;
+  margin: 0.15rem 0 0;
 }
 
 .check-cooldown-hint {

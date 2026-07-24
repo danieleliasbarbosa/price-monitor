@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=26" />
+  <link rel="stylesheet" href="/static/styles.css?v=27" />
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
@@ -225,6 +225,12 @@
           <div class="check-action">
             <button type="button" id="btnCheck" class="btn primary">Check prices</button>
             <p id="checkCooldownHint" class="check-cooldown-hint" hidden></p>
+            <div id="checkProgress" class="check-progress" hidden aria-hidden="true">
+              <div class="check-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Check in progress">
+                <div class="check-progress-bar"></div>
+              </div>
+              <p class="check-progress-label">Running…</p>
+            </div>
           </div>
           <label class="field compact summary-store">
             <span>Store</span>
@@ -265,6 +271,6 @@
     </main>
   </div>
 
-  <script src="/static/app.js?v=51"></script>
+  <script src="/static/app.js?v=52"></script>
 </body>
 </html>

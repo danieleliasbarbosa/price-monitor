@@ -36,6 +36,7 @@ const els = {
   retailerFilter: document.getElementById("retailerFilter"),
   btnCheck: document.getElementById("btnCheck"),
   checkCooldownHint: document.getElementById("checkCooldownHint"),
+  checkProgress: document.getElementById("checkProgress"),
   addForm: document.getElementById("addForm"),
   productNameInput: document.getElementById("productNameInput"),
   urlInput: document.getElementById("urlInput"),
@@ -1059,6 +1060,12 @@ function setAddProgress(running) {
   els.addProgress.setAttribute("aria-hidden", running ? "false" : "true");
 }
 
+function setCheckProgress(running) {
+  if (!els.checkProgress) return;
+  els.checkProgress.hidden = !running;
+  els.checkProgress.setAttribute("aria-hidden", running ? "false" : "true");
+}
+
 document.querySelectorAll(".auth-tab").forEach((btn) => {
   btn.addEventListener("click", () => setAuthMode(btn.dataset.mode));
 });
@@ -1288,6 +1295,7 @@ if (els.productSort) {
 els.btnCheck.addEventListener("click", async () => {
   if (!checkAllowed || els.btnCheck.disabled) return;
   els.btnCheck.disabled = true;
+  setCheckProgress(true);
   try {
     const body = {};
     if (els.retailerFilter.value) body.retailer = els.retailerFilter.value;
@@ -1309,6 +1317,8 @@ els.btnCheck.addEventListener("click", async () => {
     } catch {
       els.btnCheck.disabled = false;
     }
+  } finally {
+    setCheckProgress(false);
   }
 });
 

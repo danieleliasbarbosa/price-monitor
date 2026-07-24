@@ -208,7 +208,160 @@ class UserStore:
         data["users"][name] = entry
         self._save(data)
 
-    def find_by_email(self, email: str) -> dict[str, Any] | None:
+    def start_contact_change(
+        self,
+        username: str,
+        *,
+        field: str,
+        new_value: str,
+        current_password: str,
+        channel: str,
+    ) -> tuple[str, dict[str, Any]]:
+        """
+        Validates password + new contact, stores a hashed 6-digit code.
+        Returns (plain_code, public_profile).
+        """
+        name = normalize_username(username)
+        field = (field or "").strip().lower()
+        channel = (channel or "").strip().lower()
+        if field not in {"email", "phone"}:
+            raise ValueError("Invalid field. Use email or phone.")
+        if channel not in {"email", "phone"}:
+            raise ValueError("Invalid channel. Choose email or phone.")
+
+        data = self._load()
+        entry = data["users"].get(name)
+        if not isinstance(entry, dict):
+            raise ValueError("User not found.")
+        if not verify_password(current_password, str(entry.get("password_hash") or "")):
+            raise ValueError("Current password is incorrect.")
+
+        if field == "email":
+            new_value = validate_email(new_value)
+            current = str(entry.get("email") or "").lower()
+            if new_value == current:
+                raise ValueError("New email must be different from the current one.")
+            for other_name, other in data["users"].items():
+                if other_name == name or not isinstance(other, dict):
+                    continue
+                if str(other.get("email") or "").lower() == new_value:
+                    raise ValueError("That email is already in use.")
+        else:
+            new_value = validate_phone(new_value)
+            current = str(entry.get("phone") or "")
+            if new_value == current:
+                raise ValueError("New phone must be different from the current one.")
+
+        dest_email = str(entry.get("email") or "").strip()
+        dest_phone = str(entry.get("phone") or "").strip()
+        if channel == "email" and not dest_email:
+            raise ValueError("No email on this account to receive the code.")
+        if channel == "phone" and not dest_phone:
+            raise ValueError("No phone on this account to receive the code.")
+
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        expires = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+        entry["contact_change"] = {
+            "field": field,
+            "new_value": new_value,
+            "channel": channel,
+            "code_hash": code_hash,
+            "expires": expires,
+            "attempts": 0,
+            "created_at": _now(),
+        }
+        data["users"][name] = entry
+        self._save(data)
+        return code, self.public_profile(entry)
+
+    def confirm_contact_change(
+        self,
+        username: str,
+        *,
+        field: str,
+        new_value: str,
+        current_password: str,
+        code: str,
+    ) -> dict[str, Any]:
+        name = normalize_username(username)
+        field = (field or "").strip().lower()
+        if field not in {"email", "phone"}:
+            raise ValueError("Invalid field. Use email or phone.")
+
+        data = self._load()
+        entry = data["users"].get(name)
+        if not isinstance(entry, dict):
+            raise ValueError("User not found.")
+        if not verify_password(current_password, str(entry.get("password_hash") or "")):
+            raise ValueError("Current password is incorrect.")
+
+        pending = entry.get("contact_change")
+        if not isinstance(pending, dict):
+            raise ValueError("No pending change. Request a new code.")
+        if str(pending.get("field") or "") != field:
+            raise ValueError("No pending change for that field. Request a new code.")
+
+        if field == "email":
+            expected_value = validate_email(new_value)
+        else:
+            expected_value = validate_phone(new_value)
+        if str(pending.get("new_value") or "") != expected_value:
+            raise ValueError("New value does not match the pending request. Request a new code.")
+
+        expires_raw = str(pending.get("expires") or "").strip()
+        try:
+            expires = datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise ValueError("Code expired. Request a new one.") from None
+        if expires < datetime.now(timezone.utc):
+            entry.pop("contact_change", None)
+            data["users"][name] = entry
+            self._save(data)
+            raise ValueError("Code expired. Request a new one.")
+
+        attempts = int(pending.get("attempts") or 0)
+        if attempts >= 5:
+            entry.pop("contact_change", None)
+            data["users"][name] = entry
+            self._save(data)
+            raise ValueError("Too many attempts. Request a new code.")
+
+        code_raw = re.sub(r"\D", "", (code or "").strip())
+        if len(code_raw) != 6:
+            pending["attempts"] = attempts + 1
+            entry["contact_change"] = pending
+            data["users"][name] = entry
+            self._save(data)
+            raise ValueError("Invalid verification code.")
+
+        code_hash = hashlib.sha256(code_raw.encode("utf-8")).hexdigest()
+        if not hmac.compare_digest(code_hash, str(pending.get("code_hash") or "")):
+            pending["attempts"] = attempts + 1
+            entry["contact_change"] = pending
+            data["users"][name] = entry
+            self._save(data)
+            raise ValueError("Invalid verification code.")
+
+        if field == "email":
+            # Re-check uniqueness at confirm time.
+            for other_name, other in data["users"].items():
+                if other_name == name or not isinstance(other, dict):
+                    continue
+                if str(other.get("email") or "").lower() == expected_value:
+                    raise ValueError("That email is already in use.")
+            entry["email"] = expected_value
+        else:
+            entry["phone"] = expected_value
+
+        entry["contact_updated_at"] = _now()
+        entry.pop("contact_change", None)
+        data["users"][name] = entry
+        self._save(data)
+        return self.public_profile(entry)
+
         try:
             target = validate_email(email)
         except ValueError:

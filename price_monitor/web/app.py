@@ -69,6 +69,20 @@ class ResetPasswordBody(BaseModel):
     confirm_password: str = Field(min_length=6, max_length=128)
 
 
+class ChangeContactRequestBody(BaseModel):
+    field: str = Field(min_length=5, max_length=10)  # email | phone
+    new_value: str = Field(min_length=5, max_length=120)
+    current_password: str = Field(min_length=6, max_length=128)
+    channel: str = Field(min_length=5, max_length=10)  # email | phone
+
+
+class ChangeContactConfirmBody(BaseModel):
+    field: str = Field(min_length=5, max_length=10)
+    new_value: str = Field(min_length=5, max_length=120)
+    current_password: str = Field(min_length=6, max_length=128)
+    code: str = Field(min_length=4, max_length=12)
+
+
 class AddProductBody(BaseModel):
     url: str = Field(min_length=8)
     target_price: float = Field(gt=0)
@@ -236,6 +250,92 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"ok": True, "message": "Password changed successfully."}
+
+    @app.post("/api/auth/change-contact/request")
+    def auth_change_contact_request(
+        body: ChangeContactRequestBody, username: str = Depends(require_user)
+    ) -> dict[str, Any]:
+        from price_monitor.mail import send_email
+        from price_monitor.sms import send_sms, sms_configured
+
+        field = body.field.strip().lower()
+        channel = body.channel.strip().lower()
+        try:
+            code, profile = _user_store().start_contact_change(
+                username,
+                field=field,
+                new_value=body.new_value,
+                current_password=body.current_password,
+                channel=channel,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        label = "email" if field == "email" else "phone number"
+        msg = (
+            f"Your Price Monitor verification code is {code}. "
+            f"Use it to confirm your {label} change. It expires in 10 minutes."
+        )
+        sent = False
+        if channel == "email":
+            to = str(profile.get("email") or "").strip()
+            sent = send_email(
+                "Price Monitor verification code",
+                msg,
+                to=to,
+                html=(
+                    f"<p>Your Price Monitor verification code is "
+                    f"<strong>{code}</strong>.</p>"
+                    f"<p>Use it to confirm your {label} change. "
+                    "It expires in 10 minutes.</p>"
+                ),
+            )
+        else:
+            if not sms_configured():
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "SMS is not configured on this server. "
+                        "Choose email to receive the code, or set Twilio env vars."
+                    ),
+                )
+            to = str(profile.get("phone") or "").strip()
+            sent = send_sms(msg, to=to)
+
+        if os.getenv("DEV_PRINT_VERIFY_CODES", "").strip() in {"1", "true", "yes"}:
+            print(f"[verify] code for {username}/{field} via {channel}: {code}")
+
+        if not sent:
+            raise HTTPException(
+                status_code=502,
+                detail="Could not send the verification code. Try again shortly.",
+            )
+        return {
+            "ok": True,
+            "message": f"Verification code sent via {channel}.",
+            "channel": channel,
+            "field": field,
+        }
+
+    @app.post("/api/auth/change-contact/confirm")
+    def auth_change_contact_confirm(
+        body: ChangeContactConfirmBody, username: str = Depends(require_user)
+    ) -> dict[str, Any]:
+        try:
+            user = _user_store().confirm_contact_change(
+                username,
+                field=body.field,
+                new_value=body.new_value,
+                current_password=body.current_password,
+                code=body.code,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "ok": True,
+            "message": "Contact updated successfully.",
+            "user": user,
+        }
 
     @app.get("/api/auth/check-username")
     def auth_check_username(username: str = "") -> dict[str, Any]:
@@ -607,16 +707,21 @@ def create_app() -> FastAPI:
                         profile_base=project_root,
                         url_filter=url_filter,
                         notify_email=notify_email,
+                        show_summary=False,
                     )
+                # Log must be set before status leaves "running" (poll race).
+                job["log"] = buf.getvalue()
                 job["exit_code"] = code
                 job["status"] = "ok" if code == 0 else "finished_with_errors"
             except Exception as exc:
+                traceback.print_exc(file=buf)
+                job["log"] = buf.getvalue()
                 job["status"] = "error"
                 job["error"] = str(exc)
                 job["exit_code"] = 1
-                traceback.print_exc(file=buf)
             finally:
-                job["log"] = buf.getvalue()
+                if not job.get("log"):
+                    job["log"] = buf.getvalue()
                 job["finished_at"] = datetime.now(timezone.utc).isoformat()
                 _check_lock.release()
 

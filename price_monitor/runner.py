@@ -163,6 +163,7 @@ def run_check(
     profile_base: Path | None = None,
     url_filter: str | None = None,
     notify_email: str | None = None,
+    show_summary: bool = True,
 ) -> int:
     products, settings = load_config(config_path, allow_empty=True)
     if retailer_filter:
@@ -201,10 +202,11 @@ def run_check(
     profiles_root = profile_base or base_dir
     states_root = state_dir or (base_dir / ".state")
 
-    label = "single product" if url_filter else "Unified monitor"
-    print(f"{label} — {len(products)} product(s) across {len(by_retailer)} retailer(s)")
-    print(f"Global cooldown: {cooldown}h")
-    print()
+    if show_summary:
+        label = "single product" if url_filter else "Unified monitor"
+        print(f"{label} — {len(products)} product(s) across {len(by_retailer)} retailer(s)")
+        print(f"Global cooldown: {cooldown}h")
+        print()
 
     for retailer, group in by_retailer.items():
         try:
@@ -222,10 +224,11 @@ def run_check(
         state_path = (states_root / f"{retailer}.json").resolve()
         state = load_state(state_path)
 
-        print(f"=== {adapter.brand} ({len(group)} product(s)) ===")
-        print(f"Profile: {profile_dir}")
-        print(f"Headless: {use_headless}")
-        print()
+        if show_summary:
+            print(f"=== {adapter.brand} ({len(group)} product(s)) ===")
+            print(f"Profile: {profile_dir}")
+            print(f"Headless: {use_headless}")
+            print()
 
         if retailer == "instacart" and (
             not profile_dir.exists() or not any(profile_dir.iterdir())
@@ -241,8 +244,9 @@ def run_check(
         # Walmart SerpApi: sem browser / sem PerimeterX
         can_api = getattr(adapter, "can_use_api", None)
         if callable(can_api) and can_api(rsettings):
-            print("  Mode: SerpApi (no browser)")
-            print()
+            if show_summary:
+                print("  Mode: SerpApi (no browser)")
+                print()
             for idx, product in enumerate(group, start=1):
                 print(f"[{retailer} {idx}/{len(group)}] {product.name}")
                 print(f"  URL: {product.url}")

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=18" />
+  <link rel="stylesheet" href="/static/styles.css?v=25" />
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
@@ -95,7 +95,7 @@
         <div class="section-head account-head">
           <div>
             <h2 id="account-title">My account</h2>
-            <p class="muted" id="accountSubtitle">Your details and password change.</p>
+            <p class="muted" id="accountSubtitle">Your details and contact settings.</p>
           </div>
           <button type="button" id="btnToggleAccount" class="btn ghost" aria-controls="accountBody" aria-expanded="true">
             Hide details
@@ -108,8 +108,54 @@
               <p><span>Username</span><strong id="profileUsername">—</strong></p>
               <p><span>Email</span><strong id="profileEmail">—</strong></p>
               <p><span>Phone</span><strong id="profilePhone">—</strong></p>
-              <button type="button" id="btnChangePassword" class="btn">Change password</button>
+              <div class="account-actions">
+                <button type="button" id="btnChangeEmail" class="btn">Change email</button>
+                <button type="button" id="btnChangePhone" class="btn">Change phone</button>
+                <button type="button" id="btnChangePassword" class="btn">Change password</button>
+              </div>
             </div>
+            <form id="contactForm" class="password-form" hidden>
+              <h3 id="contactFormTitle">Change email</h3>
+              <input type="hidden" id="contactField" value="email" />
+              <label class="field">
+                <span>Current password <em class="req">*</em></span>
+                <div class="password-wrap">
+                  <input id="contactCurrentPassword" type="password" required minlength="6" autocomplete="current-password" />
+                  <button type="button" class="password-toggle" data-target="contactCurrentPassword" aria-label="Show password" aria-pressed="false">Show</button>
+                </div>
+              </label>
+              <label class="field" id="contactEmailField">
+                <span>New email <em class="req">*</em></span>
+                <input id="contactNewEmail" type="email" maxlength="120" autocomplete="email" placeholder="you@gmail.com" />
+              </label>
+              <label class="field" id="contactPhoneField" hidden>
+                <span>New phone <em class="req">*</em></span>
+                <input id="contactNewPhone" type="tel" inputmode="numeric" maxlength="14" autocomplete="tel" placeholder="(650) 555-0100" />
+              </label>
+              <fieldset class="channel-fieldset">
+                <legend>Receive code via <em class="req">*</em></legend>
+                <label class="channel-option">
+                  <input type="radio" name="contactChannel" value="email" checked />
+                  <span>Current email</span>
+                </label>
+                <label class="channel-option">
+                  <input type="radio" name="contactChannel" value="phone" />
+                  <span>Current phone (SMS)</span>
+                </label>
+              </fieldset>
+              <div class="password-actions">
+                <button type="button" id="btnSendContactCode" class="btn">Send code</button>
+              </div>
+              <label class="field">
+                <span>Verification code <em class="req">*</em></span>
+                <input id="contactCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" />
+              </label>
+              <div class="password-actions">
+                <button type="submit" class="btn primary">Confirm change</button>
+                <button type="button" id="btnCancelContact" class="btn ghost">Cancel</button>
+              </div>
+              <p id="contactMsg" class="form-msg" role="status"></p>
+            </form>
             <form id="passwordForm" class="password-form" hidden>
               <h3>Change password</h3>
               <label class="field">
@@ -190,24 +236,16 @@
         </form>
         <p class="required-note"><em class="req">*</em> Required field</p>
         <p id="formMsg" class="form-msg" role="status"></p>
-      </section>
-
-      <section class="log-panel" aria-labelledby="log-title">
-        <div class="section-head">
-          <h2 id="log-title">Check log</h2>
-          <p id="jobStatus" class="muted">No checks in this session.</p>
-        </div>
-        <div id="checkProgress" class="check-progress" hidden aria-hidden="true">
+        <div id="addProgress" class="check-progress" hidden aria-hidden="true">
           <div class="check-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Check in progress">
             <div class="check-progress-bar"></div>
           </div>
           <p class="check-progress-label">Running…</p>
         </div>
-        <pre id="logOutput" class="log"></pre>
       </section>
     </main>
   </div>
 
-  <script src="/static/app.js?v=35"></script>
+  <script src="/static/app.js?v=47"></script>
 </body>
 </html>

@@ -40,14 +40,26 @@ const els = {
   urlInput: document.getElementById("urlInput"),
   targetInput: document.getElementById("targetInput"),
   formMsg: document.getElementById("formMsg"),
-  logOutput: document.getElementById("logOutput"),
-  jobStatus: document.getElementById("jobStatus"),
-  checkProgress: document.getElementById("checkProgress"),
+  addProgress: document.getElementById("addProgress"),
   profileName: document.getElementById("profileName"),
   profileUsername: document.getElementById("profileUsername"),
   profileEmail: document.getElementById("profileEmail"),
   profilePhone: document.getElementById("profilePhone"),
   passwordForm: document.getElementById("passwordForm"),
+  contactForm: document.getElementById("contactForm"),
+  contactFormTitle: document.getElementById("contactFormTitle"),
+  contactField: document.getElementById("contactField"),
+  contactCurrentPassword: document.getElementById("contactCurrentPassword"),
+  contactEmailField: document.getElementById("contactEmailField"),
+  contactPhoneField: document.getElementById("contactPhoneField"),
+  contactNewEmail: document.getElementById("contactNewEmail"),
+  contactNewPhone: document.getElementById("contactNewPhone"),
+  contactCode: document.getElementById("contactCode"),
+  contactMsg: document.getElementById("contactMsg"),
+  btnChangeEmail: document.getElementById("btnChangeEmail"),
+  btnChangePhone: document.getElementById("btnChangePhone"),
+  btnSendContactCode: document.getElementById("btnSendContactCode"),
+  btnCancelContact: document.getElementById("btnCancelContact"),
   btnChangePassword: document.getElementById("btnChangePassword"),
   btnCancelPassword: document.getElementById("btnCancelPassword"),
   accountBody: document.getElementById("accountBody"),
@@ -68,6 +80,8 @@ let usernameCheckTimer = null;
 let usernameAvailable = null;
 let currentProducts = [];
 let checkAllowed = true;
+let currentProfileEmail = "";
+let currentProfilePhone = "";
 
 const REMEMBER_USER_KEY = "pm_remember_username";
 const REMEMBER_FLAG_KEY = "pm_remember_username_enabled";
@@ -535,7 +549,7 @@ function applyAccountVisibility() {
   if (els.accountSubtitle) {
     els.accountSubtitle.textContent = hidden
       ? "Details hidden."
-      : "Your details and password change.";
+      : "Your details and contact settings.";
   }
 }
 
@@ -565,15 +579,21 @@ function resetPasswordFormFields() {
   });
 }
 
+function setAccountActionButtonsVisible(visible) {
+  [els.btnChangeEmail, els.btnChangePhone, els.btnChangePassword].forEach((btn) => {
+    if (btn) btn.hidden = !visible;
+  });
+}
+
 function openPasswordForm() {
   if (!els.passwordForm) return;
-  // Make sure the account section is visible.
+  closeContactForm();
   if (els.accountBody?.hidden) {
     localStorage.removeItem(HIDE_ACCOUNT_KEY);
     applyAccountVisibility();
   }
   els.passwordForm.hidden = false;
-  if (els.btnChangePassword) els.btnChangePassword.hidden = true;
+  setAccountActionButtonsVisible(false);
   els.passwordMsg.textContent = "";
   els.passwordMsg.classList.remove("error");
   els.currentPassword?.focus();
@@ -582,8 +602,99 @@ function openPasswordForm() {
 function closePasswordForm() {
   if (!els.passwordForm) return;
   els.passwordForm.hidden = true;
-  if (els.btnChangePassword) els.btnChangePassword.hidden = false;
+  setAccountActionButtonsVisible(true);
   resetPasswordFormFields();
+}
+
+function resetContactFormFields() {
+  if (!els.contactForm) return;
+  if (els.contactCurrentPassword) els.contactCurrentPassword.value = "";
+  if (els.contactNewEmail) els.contactNewEmail.value = "";
+  if (els.contactNewPhone) els.contactNewPhone.value = "";
+  if (els.contactCode) els.contactCode.value = "";
+  if (els.contactMsg) {
+    els.contactMsg.textContent = "";
+    els.contactMsg.classList.remove("error");
+  }
+  document.querySelectorAll("#contactForm .password-toggle").forEach((btn) => {
+    const input = document.getElementById(btn.dataset.target);
+    if (!input) return;
+    input.type = "password";
+    btn.textContent = "Show";
+    btn.setAttribute("aria-pressed", "false");
+    btn.setAttribute("aria-label", "Show password");
+  });
+  const emailRadio = els.contactForm.querySelector(
+    'input[name="contactChannel"][value="email"]'
+  );
+  if (emailRadio) emailRadio.checked = true;
+}
+
+function openContactForm(field) {
+  if (!els.contactForm) return;
+  closePasswordForm();
+  if (els.accountBody?.hidden) {
+    localStorage.removeItem(HIDE_ACCOUNT_KEY);
+    applyAccountVisibility();
+  }
+  const isEmail = field === "email";
+  resetContactFormFields();
+  els.contactField.value = isEmail ? "email" : "phone";
+  if (els.contactFormTitle) {
+    els.contactFormTitle.textContent = isEmail ? "Change email" : "Change phone";
+  }
+  if (els.contactEmailField) els.contactEmailField.hidden = !isEmail;
+  if (els.contactPhoneField) els.contactPhoneField.hidden = isEmail;
+  if (els.contactNewEmail) {
+    els.contactNewEmail.required = isEmail;
+    els.contactNewEmail.disabled = !isEmail;
+  }
+  if (els.contactNewPhone) {
+    els.contactNewPhone.required = !isEmail;
+    els.contactNewPhone.disabled = isEmail;
+  }
+  els.contactForm.hidden = false;
+  setAccountActionButtonsVisible(false);
+  els.contactCurrentPassword?.focus();
+}
+
+function closeContactForm() {
+  if (!els.contactForm) return;
+  els.contactForm.hidden = true;
+  setAccountActionButtonsVisible(true);
+  resetContactFormFields();
+}
+
+function selectedContactChannel() {
+  const checked = els.contactForm?.querySelector('input[name="contactChannel"]:checked');
+  return checked?.value === "phone" ? "phone" : "email";
+}
+
+function contactNewValue() {
+  const field = els.contactField?.value === "phone" ? "phone" : "email";
+  if (field === "phone") return (els.contactNewPhone?.value || "").trim();
+  return (els.contactNewEmail?.value || "").trim();
+}
+
+function normalizePhoneDigits(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function isSameAsCurrentContact(field, newValue) {
+  if (field === "phone") {
+    const next = normalizePhoneDigits(newValue);
+    const current = normalizePhoneDigits(currentProfilePhone);
+    return Boolean(next) && next === current && current.length === 10;
+  }
+  const next = String(newValue || "").trim().toLowerCase();
+  const current = String(currentProfileEmail || "").trim().toLowerCase();
+  return Boolean(next) && next === current;
+}
+
+function sameContactMessage(field) {
+  return field === "phone"
+    ? "This is your current phone."
+    : "This is your current email.";
 }
 
 if (els.btnChangePassword) {
@@ -591,6 +702,130 @@ if (els.btnChangePassword) {
 }
 if (els.btnCancelPassword) {
   els.btnCancelPassword.addEventListener("click", () => closePasswordForm());
+}
+if (els.btnChangeEmail) {
+  els.btnChangeEmail.addEventListener("click", () => openContactForm("email"));
+}
+if (els.btnChangePhone) {
+  els.btnChangePhone.addEventListener("click", () => openContactForm("phone"));
+}
+if (els.btnCancelContact) {
+  els.btnCancelContact.addEventListener("click", () => closeContactForm());
+}
+if (els.contactNewPhone) {
+  els.contactNewPhone.addEventListener("input", () => {
+    els.contactNewPhone.value = formatPhoneMask(els.contactNewPhone.value);
+    if (!els.contactMsg) return;
+    if (isSameAsCurrentContact("phone", els.contactNewPhone.value)) {
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = sameContactMessage("phone");
+    } else if (els.contactMsg.textContent === sameContactMessage("phone")) {
+      els.contactMsg.textContent = "";
+      els.contactMsg.classList.remove("error");
+    }
+  });
+}
+if (els.contactNewEmail) {
+  els.contactNewEmail.addEventListener("input", () => {
+    if (!els.contactMsg) return;
+    if (isSameAsCurrentContact("email", els.contactNewEmail.value)) {
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = sameContactMessage("email");
+    } else if (els.contactMsg.textContent === sameContactMessage("email")) {
+      els.contactMsg.textContent = "";
+      els.contactMsg.classList.remove("error");
+    }
+  });
+}
+if (els.btnSendContactCode) {
+  els.btnSendContactCode.addEventListener("click", async () => {
+    if (!els.contactMsg) return;
+    els.contactMsg.textContent = "";
+    els.contactMsg.classList.remove("error");
+    const field = els.contactField?.value === "phone" ? "phone" : "email";
+    const currentPassword = els.contactCurrentPassword?.value || "";
+    const newValue = contactNewValue();
+    const channel = selectedContactChannel();
+    if (!currentPassword || !newValue) {
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = "Fill in the current password and the new value.";
+      return;
+    }
+    if (isSameAsCurrentContact(field, newValue)) {
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = sameContactMessage(field);
+      return;
+    }
+    if (field === "phone" && newValue.replace(/\D/g, "").length !== 10) {
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = "Invalid phone. Use the format (xxx) xxx-xxxx.";
+      return;
+    }
+    try {
+      els.btnSendContactCode.disabled = true;
+      const result = await api("/api/auth/change-contact/request", {
+        method: "POST",
+        body: JSON.stringify({
+          field,
+          new_value: newValue,
+          current_password: currentPassword,
+          channel,
+        }),
+      });
+      els.contactMsg.textContent =
+        result.message || `Verification code sent via ${channel}.`;
+      els.contactCode?.focus();
+    } catch (err) {
+      if (err.status === 401) return showAuth();
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = err.message;
+    } finally {
+      els.btnSendContactCode.disabled = false;
+    }
+  });
+}
+if (els.contactForm) {
+  els.contactForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    els.contactMsg.textContent = "";
+    els.contactMsg.classList.remove("error");
+    const field = els.contactField?.value === "phone" ? "phone" : "email";
+    const currentPassword = els.contactCurrentPassword?.value || "";
+    const newValue = contactNewValue();
+    const code = (els.contactCode?.value || "").trim();
+    if (!currentPassword || !newValue || !code) {
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = "Fill in password, new value, and verification code.";
+      return;
+    }
+    if (isSameAsCurrentContact(field, newValue)) {
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = sameContactMessage(field);
+      return;
+    }
+    try {
+      const result = await api("/api/auth/change-contact/confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          field,
+          new_value: newValue,
+          current_password: currentPassword,
+          code,
+        }),
+      });
+      els.contactMsg.textContent = result.message || "Contact updated successfully.";
+      await loadProfile();
+      if (result.user?.name || result.user?.username) {
+        const displayName = result.user.name || result.user.username;
+        if (els.userLabel) els.userLabel.textContent = displayName;
+      }
+      setTimeout(() => closeContactForm(), 900);
+    } catch (err) {
+      if (err.status === 401) return showAuth();
+      els.contactMsg.classList.add("error");
+      els.contactMsg.textContent = err.message;
+    }
+  });
 }
 
 function renderProducts(products) {
@@ -700,6 +935,8 @@ function fillProfile(user) {
   if (els.profileUsername) els.profileUsername.textContent = user.username || "—";
   if (els.profileEmail) els.profileEmail.textContent = user.email || "—";
   if (els.profilePhone) els.profilePhone.textContent = user.phone || "—";
+  currentProfileEmail = user.email || "";
+  currentProfilePhone = user.phone || "";
   if (els.userLabel) {
     els.userLabel.textContent = user.name || user.username || "—";
   }
@@ -719,32 +956,24 @@ async function enterApp(username, user) {
 }
 
 async function pollJob(jobId) {
-  setCheckProgress(true);
-  try {
-    while (true) {
-      const job = await api(`/api/check/${jobId}`);
-      els.logOutput.textContent = job.log || "";
-      els.jobStatus.textContent = `status: ${job.status}${job.exit_code != null ? ` · exit ${job.exit_code}` : ""}`;
-      if (job.status === "running") {
-        setCheckProgress(true);
-        await new Promise((resolve) => {
-          pollTimer = setTimeout(resolve, 1200);
-        });
-        continue;
-      }
-      await loadProducts();
-      await loadMeta();
-      return job;
+  while (true) {
+    const job = await api(`/api/check/${jobId}`);
+    if (job.status === "running") {
+      await new Promise((resolve) => {
+        pollTimer = setTimeout(resolve, 1200);
+      });
+      continue;
     }
-  } finally {
-    setCheckProgress(false);
+    await loadProducts();
+    await loadMeta();
+    return job;
   }
 }
 
-function setCheckProgress(running) {
-  if (!els.checkProgress) return;
-  els.checkProgress.hidden = !running;
-  els.checkProgress.setAttribute("aria-hidden", running ? "false" : "true");
+function setAddProgress(running) {
+  if (!els.addProgress) return;
+  els.addProgress.hidden = !running;
+  els.addProgress.setAttribute("aria-hidden", running ? "false" : "true");
 }
 
 document.querySelectorAll(".auth-tab").forEach((btn) => {
@@ -968,8 +1197,6 @@ els.passwordForm.addEventListener("submit", async (event) => {
 els.btnCheck.addEventListener("click", async () => {
   if (!checkAllowed || els.btnCheck.disabled) return;
   els.btnCheck.disabled = true;
-  els.jobStatus.textContent = "checking…";
-  els.logOutput.textContent = "";
   try {
     const body = {};
     if (els.retailerFilter.value) body.retailer = els.retailerFilter.value;
@@ -982,8 +1209,10 @@ els.btnCheck.addEventListener("click", async () => {
     await pollJob(started.job_id);
   } catch (err) {
     if (err.status === 401) return showAuth();
-    els.jobStatus.textContent = err.message;
-    els.logOutput.textContent = err.message;
+    if (els.checkCooldownHint) {
+      els.checkCooldownHint.hidden = false;
+      els.checkCooldownHint.textContent = err.message;
+    }
     try {
       await loadMeta();
     } catch {
@@ -1008,6 +1237,7 @@ els.addForm.addEventListener("submit", async (event) => {
     els.formMsg.textContent = "Enter a valid target price (e.g. 5.00).";
     return;
   }
+  setAddProgress(false);
   try {
     const payload = {
       url,
@@ -1029,11 +1259,9 @@ els.addForm.addEventListener("submit", async (event) => {
     }
     els.addForm.reset();
     await loadProducts();
-      // Keep "Product added." until the check truly finishes.
     if (result.check_started && result.job_id) {
       els.formMsg.textContent = "Product added.";
-      els.jobStatus.textContent = "checking added product…";
-      els.logOutput.textContent = "";
+      setAddProgress(true);
       if (pollTimer) clearTimeout(pollTimer);
       const jobId = result.job_id;
       const shownAt = Date.now();
@@ -1055,6 +1283,8 @@ els.addForm.addEventListener("submit", async (event) => {
     if (err.status === 401) return showAuth();
     els.formMsg.classList.add("error");
     els.formMsg.textContent = err.message;
+  } finally {
+    setAddProgress(false);
   }
 });
 

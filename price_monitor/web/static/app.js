@@ -42,6 +42,7 @@ const els = {
   formMsg: document.getElementById("formMsg"),
   logOutput: document.getElementById("logOutput"),
   jobStatus: document.getElementById("jobStatus"),
+  checkProgress: document.getElementById("checkProgress"),
   profileName: document.getElementById("profileName"),
   profileUsername: document.getElementById("profileUsername"),
   profileEmail: document.getElementById("profileEmail"),
@@ -203,8 +204,8 @@ function statusLabel(last) {
   if (!last) return { text: "not checked", cls: "" };
   const map = {
     ok: { text: "no alert", cls: "ok" },
-    unavailable: { text: "unavailable", cls: "error" },
-    alert: { text: "ALERT", cls: "alert" },
+    unavailable: { text: "unavailable", cls: "unavailable" },
+    alert: { text: "alert", cls: "alert" },
     cooldown: { text: "cooldown", cls: "cooldown" },
     error: { text: "error", cls: "error" },
   };
@@ -355,7 +356,7 @@ function setAuthMode(mode) {
   if (els.rememberUserField) {
     els.rememberUserField.hidden = !isLogin;
   }
-  if (els.authLinks) els.authLinks.hidden = true;
+  if (els.authLinks) els.authLinks.hidden = !isLogin;
   if (els.backToLoginWrap) els.backToLoginWrap.hidden = isLogin || isRegister;
 
   if (isRegister) {
@@ -718,20 +719,32 @@ async function enterApp(username, user) {
 }
 
 async function pollJob(jobId) {
-  while (true) {
-    const job = await api(`/api/check/${jobId}`);
-    els.logOutput.textContent = job.log || "";
-    els.jobStatus.textContent = `status: ${job.status}${job.exit_code != null ? ` · exit ${job.exit_code}` : ""}`;
-    if (job.status === "running") {
-      await new Promise((resolve) => {
-        pollTimer = setTimeout(resolve, 1200);
-      });
-      continue;
+  setCheckProgress(true);
+  try {
+    while (true) {
+      const job = await api(`/api/check/${jobId}`);
+      els.logOutput.textContent = job.log || "";
+      els.jobStatus.textContent = `status: ${job.status}${job.exit_code != null ? ` · exit ${job.exit_code}` : ""}`;
+      if (job.status === "running") {
+        setCheckProgress(true);
+        await new Promise((resolve) => {
+          pollTimer = setTimeout(resolve, 1200);
+        });
+        continue;
+      }
+      await loadProducts();
+      await loadMeta();
+      return job;
     }
-    await loadProducts();
-    await loadMeta();
-    return job;
+  } finally {
+    setCheckProgress(false);
   }
+}
+
+function setCheckProgress(running) {
+  if (!els.checkProgress) return;
+  els.checkProgress.hidden = !running;
+  els.checkProgress.setAttribute("aria-hidden", running ? "false" : "true");
 }
 
 document.querySelectorAll(".auth-tab").forEach((btn) => {

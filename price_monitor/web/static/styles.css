@@ -366,8 +366,9 @@ main {
   font-weight: 600;
 }
 
-.status.alert { color: var(--bad); }
-.status.ok { color: var(--good); }
+.status.alert { color: var(--good); }
+.status.ok { color: var(--bad); }
+.status.unavailable { color: #6b7280; }
 .status.error { color: var(--amber); }
 .status.cooldown { color: var(--muted); }
 
@@ -453,6 +454,43 @@ input:focus, select:focus {
   font-size: 0.78rem;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.check-progress {
+  margin: 0 0 0.85rem;
+}
+
+.check-progress[hidden] {
+  display: none;
+}
+
+.check-progress-track {
+  position: relative;
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.14);
+}
+
+.check-progress-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--teal), #14b8a6);
+  animation: check-progress-slide 1.25s ease-in-out infinite;
+}
+
+.check-progress-label {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+@keyframes check-progress-slide {
+  0% { left: -40%; }
+  100% { left: 100%; }
 }
 
 .empty {

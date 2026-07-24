@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=16" />
+  <link rel="stylesheet" href="/static/styles.css?v=18" />
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true"></div>
@@ -67,7 +67,7 @@
         </label>
         <button type="submit" class="btn primary auth-submit" id="authSubmit">Sign in</button>
       </form>
-      <p class="auth-links" id="authLinks" hidden>
+      <p class="auth-links" id="authLinks">
         <button type="button" class="linkish" id="forgotPasswordLink">Forgot password</button>
       </p>
       <p class="auth-links" id="backToLoginWrap" hidden>
@@ -197,11 +197,17 @@
           <h2 id="log-title">Check log</h2>
           <p id="jobStatus" class="muted">No checks in this session.</p>
         </div>
+        <div id="checkProgress" class="check-progress" hidden aria-hidden="true">
+          <div class="check-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Check in progress">
+            <div class="check-progress-bar"></div>
+          </div>
+          <p class="check-progress-label">Running…</p>
+        </div>
         <pre id="logOutput" class="log"></pre>
       </section>
     </main>
   </div>
 
-  <script src="/static/app.js?v=32"></script>
+  <script src="/static/app.js?v=35"></script>
 </body>
 </html>
